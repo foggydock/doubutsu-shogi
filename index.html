@@ -45,8 +45,6 @@ h1{font-size:22px;margin:6px 0 2px;letter-spacing:2px;}
   aspect-ratio:3/4;
   transition:transform .35s;
 }
-#board.flip{transform:rotate(180deg);}
-#board.flip .cell{transform:rotate(180deg);}
 .cell{
   background:var(--board);border-radius:4px;position:relative;
   display:flex;align-items:center;justify-content:center;font-size:clamp(26px,8vw,40px);
@@ -316,8 +314,6 @@ function pieceHTML(p){
 }
 
 function render(){
-  const flip = (mode==='two' && turn===1);
-  boardEl.classList.toggle('flip',flip);
   boardEl.innerHTML='';
   const hi = sel ? legalTargets() : [];
   for(let i=0;i<12;i++){
@@ -333,13 +329,11 @@ function render(){
     d.onclick=()=>tapCell(i);
     boardEl.appendChild(d);
   }
-  // したがわ = いま ばんの ひと（ふたりで あそぶ とき）
-  const bottomOwner = flip ? 1 : 0;
-  renderHand(bottomOwner,'hand0'); renderHand(1-bottomOwner,'hand1');
+  renderHand(0,'hand0'); renderHand(1,'hand1');
   const nm = o => mode==='two' ? (o===0?'あお🔵の もちごま':'あか🔴の もちごま')
                                : (o===0?'きみの もちごま':'コンピュータの もちごま');
-  $('lab0').textContent = nm(bottomOwner);
-  $('lab1').textContent = nm(1-bottomOwner);
+  $('lab0').textContent = nm(0);
+  $('lab1').textContent = nm(1);
   const m=$('msg');
   if(over){
     m.textContent=over.text; m.className='';
