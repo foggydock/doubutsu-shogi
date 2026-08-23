@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>どうぶつしょうぎ</title>
+<style>
+:root{
+  --bg:#fdf6e3; --board:#e8c98a; --line:#a9803f;
+  --me:#2e6fd8; --you:#d84a3a; --hi:#7fd47f; --sel:#ffe066;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:var(--bg); color:#3a2c14;
+  font-family:"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN",sans-serif;
+  display:flex; flex-direction:column; align-items:center;
+  padding:env(safe-area-inset-top) 8px 8px; overflow:hidden;
+  user-select:none; -webkit-user-select:none;
+}
+h1{font-size:22px;margin:6px 0 2px;letter-spacing:2px;}
+#msg{font-size:20px;font-weight:bold;min-height:28px;margin:2px 0 4px;text-align:center;}
+#msg.me{color:var(--me);} #msg.you{color:var(--you);}
+
+#hand1,#hand0{
+  display:flex;gap:6px;min-height:56px;align-items:center;justify-content:center;
+  width:100%;max-width:340px;flex-wrap:wrap;
+}
+.hand-label{font-size:13px;opacity:.7;width:100%;text-align:center;margin:0;}
+.hp{
+  width:46px;height:46px;border-radius:10px;border:3px solid transparent;
+  background:#fff8e7;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:24px;line-height:1;
+}
+.hp{box-shadow:0 2px 0 #cbb188;}
+.hp.o0{border-color:var(--me);} .hp.o1{border-color:var(--you);}
+.hp.sel{background:var(--sel);}
+.hp .n{font-size:11px;}
+
+#board{
+  display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(4,1fr);
+  gap:3px;background:var(--line);padding:3px;border-radius:8px;
+  width:min(86vw, 55vh * 0.75, 430px);
+  aspect-ratio:3/4;
+  transition:transform .35s;
+}
+#board.flip{transform:rotate(180deg);}
+#board.flip .cell{transform:rotate(180deg);}
+.cell{
+  background:var(--board);border-radius:4px;position:relative;
+  display:flex;align-items:center;justify-content:center;font-size:clamp(26px,8vw,40px);
+  transition:transform .35s;
+}
+.cell.goal0{background:#f0dcae;} .cell.goal1{background:#f0dcae;}
+.cell .pc{
+  width:86%;height:86%;border-radius:8px;border:3px solid;
+  display:flex;align-items:center;justify-content:center;
+  background:#fffdf5;position:relative;
+}
+.cell .pc.o0{border-color:var(--me);}
+.cell .pc.o1{border-color:var(--you);transform:rotate(180deg);}
+.cell.sel .pc{background:var(--sel);}
+.cell.hi::after{
+  content:"";position:absolute;width:34%;height:34%;border-radius:50%;
+  background:var(--hi);opacity:.85;
+}
+.cell.hi.has::after{width:100%;height:100%;border-radius:4px;opacity:.45;}
+.cell.last{outline:3px solid #ff9f43;outline-offset:-3px;}
+
+#ctrl{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;justify-content:center;}
+button{
+  font-family:inherit;font-size:16px;padding:10px 16px;border-radius:12px;
+  border:none;background:#f0a04b;color:#fff;font-weight:bold;box-shadow:0 3px 0 #c37b2d;
+}
+button:active{transform:translateY(2px);box-shadow:0 1px 0 #c37b2d;}
+button.sub{background:#9ab3c9;box-shadow:0 3px 0 #74879a;}
+
+#overlay{
+  position:fixed;inset:0;background:#fdf6e3;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:10;
+  padding:24px 16px;text-align:center;overflow-y:auto;
+}
+#ovbtns{display:flex;flex-direction:column;gap:10px;width:100%;max-width:330px;padding-bottom:20px;}
+#ovbtns button{font-size:18px;padding:14px 16px;}
+#overlay.hide{display:none;}
+#overlay h2{font-size:26px;margin:0;}
+#overlay p{font-size:16px;margin:0;line-height:1.7;}
+#rules{font-size:14px;text-align:left;max-width:330px;background:#fff8e7;padding:14px;border-radius:12px;}
+#rules b{display:inline-block;width:5.2em;}
+</style>
+</head>
+<body>
+
+<h1>どうぶつしょうぎ</h1>
+<div id="msg"></div>
+
+<p class="hand-label" id="lab1">あいての もちごま</p>
+<div id="hand1"></div>
+
+<div id="board"></div>
+
+<div id="hand0"></div>
+<p class="hand-label" id="lab0">じぶんの もちごま</p>
+
+<div id="ctrl">
+  <button id="undo" class="sub">まった</button>
+  <button id="again" class="sub">さいしょから</button>
+</div>
+
+<div id="overlay">
+  <h2 id="ovt">どうぶつしょうぎ</h2>
+  <p id="ovp"></p>
+  <div id="rules">
+    <b>🦁ライオン</b>ぜんぶの ほうこうに 1ます<br>
+    <b>🦒きりん</b>たて・よこに 1ます<br>
+    <b>🐘ぞう</b>ななめに 1ます<br>
+    <b>🐤ひよこ</b>まえに 1ます<br>
+    <b>🐔にわとり</b>ひよこが いちばん おくに ついたら へんしん。ななめうしろ いがいに 1ます<br><br>
+    とった どうぶつは じぶんの もちごまに なって、あいてる ますに おけるよ。<br>
+    <b>🏁かち</b>あいての ライオンを とる／じぶんの ライオンが いちばん おくに ついて、とられない こと
+  </div>
+  <div id="ovbtns"></div>
+</div>
+
+<script>
+"use strict";
+/* ===== ばんめん ===== */
+// index = r*3+c   r=0 が うえ(あいて)、r=3 が した(じぶん)
+// piece = {t:'L'|'G'|'E'|'C'|'H', o:0|1}   o=0 が した(せんて/じぶん)
+const EMOJI={L:'🦁',G:'🦒',E:'🐘',C:'🐤',H:'🐔'};
+const NAME ={L:'ライオン',G:'きりん',E:'ぞう',C:'ひよこ',H:'にわとり'};
+const VAL  ={L:1000,G:60,E:55,C:25,H:70};
+
+// うごきかた（o=0 めせん。まえ = row -1）
+const MOVES={
+  L:[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]],
+  G:[[-1,0],[1,0],[0,-1],[0,1]],
+  E:[[-1,-1],[-1,1],[1,-1],[1,1]],
+  C:[[-1,0]],
+  H:[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]]
+};
+
+let bd, hands, turn, hist, mode, over, sel, lastMove, busy;
+
+function initGame(){
+  bd=new Array(12).fill(null);
+  const put=(i,t,o)=>bd[i]={t:t,o:o};
+  put(0,'G',1); put(1,'L',1); put(2,'E',1);
+  put(4,'C',1);
+  put(7,'C',0);
+  put(9,'E',0); put(10,'L',0); put(11,'G',0);
+  hands=[[],[]];
+  turn=0; over=null; sel=null; lastMove=null; hist=[]; busy=false;
+}
+
+/* ===== ルール ===== */
+function inB(r,c){return r>=0&&r<4&&c>=0&&c<3;}
+
+function movesFrom(state,i){
+  const p=state.bd[i]; if(!p) return [];
+  const r=(i/3|0), c=i%3, out=[];
+  for(const d of MOVES[p.t]){
+    const dr = p.o===0 ? d[0] : -d[0];
+    const dc = p.o===0 ? d[1] : -d[1];
+    const nr=r+dr, nc=c+dc;
+    if(!inB(nr,nc)) continue;
+    const t=state.bd[nr*3+nc];
+    if(t && t.o===p.o) continue;
+    out.push(nr*3+nc);
+  }
+  return out;
+}
+
+// その ますが あいて(by)に せめられて いるか
+function attacked(state,idx,by){
+  for(let i=0;i<12;i++){
+    const p=state.bd[i];
+    if(!p||p.o!==by) continue;
+    if(movesFrom(state,i).includes(idx)) return true;
+  }
+  return false;
+}
+
+function genMoves(state,o){
+  const list=[];
+  for(let i=0;i<12;i++){
+    const p=state.bd[i];
+    if(!p||p.o!==o) continue;
+    for(const to of movesFrom(state,i)) list.push({from:i,to:to});
+  }
+  // もちごまを おく
+  const seen={};
+  state.hands[o].forEach((t,hi)=>{
+    if(seen[t]) return; seen[t]=1;
+    for(let i=0;i<12;i++) if(!state.bd[i]) list.push({drop:t,to:i});
+  });
+  return list;
+}
+
+function apply(state,m){
+  const undo={m:m,cap:null,promo:false,hidx:-1};
+  if(m.drop){
+    const hi=state.hands[state.turn].indexOf(m.drop);
+    state.hands[state.turn].splice(hi,1);
+    undo.hidx=hi;
+    state.bd[m.to]={t:m.drop,o:state.turn};
+  }else{
+    const p=state.bd[m.from];
+    const cap=state.bd[m.to];
+    if(cap){
+      undo.cap=cap;
+      state.hands[state.turn].push(cap.t==='H'?'C':cap.t);
+    }
+    state.bd[m.to]=p; state.bd[m.from]=null;
+    const backRow = p.o===0?0:3;
+    if(p.t==='C' && (m.to/3|0)===backRow){ p.t='H'; undo.promo=true; }
+  }
+  state.turn=1-state.turn;
+  return undo;
+}
+
+function unapply(state,u){
+  state.turn=1-state.turn;
+  const m=u.m;
+  if(m.drop){
+    state.bd[m.to]=null;
+    state.hands[state.turn].splice(u.hidx,0,m.drop);
+  }else{
+    const p=state.bd[m.to];
+    if(u.promo) p.t='C';
+    state.bd[m.from]=p;
+    state.bd[m.to]=u.cap||null;
+    if(u.cap){
+      const t=u.cap.t==='H'?'C':u.cap.t;
+      const hi=state.hands[state.turn].lastIndexOf(t);
+      state.hands[state.turn].splice(hi,1);
+    }
+  }
+}
+
+function lionAt(state,o){
+  for(let i=0;i<12;i++){const p=state.bd[i]; if(p&&p.o===o&&p.t==='L') return i;}
+  return -1;
+}
+
+// o が かった？ (o が さした ちょくご に よぶ)
+function winnerAfter(state,o){
+  if(lionAt(state,1-o)<0) return o;              // ライオンを とった
+  const li=lionAt(state,o);
+  const goal = o===0?0:3;
+  if((li/3|0)===goal && !attacked(state,li,1-o)) return o;  // トライ
+  return null;
+}
+
+/* ===== CPU ===== */
+function evaluate(state,o){
+  let s=0;
+  for(let i=0;i<12;i++){
+    const p=state.bd[i]; if(!p) continue;
+    let v=VAL[p.t];
+    if(p.t!=='L'){
+      const adv = p.o===0 ? (3-(i/3|0)) : (i/3|0);
+      v += adv*3;
+    }else{
+      const adv = p.o===0 ? (3-(i/3|0)) : (i/3|0);
+      v += adv*6;                                  // トライを めざす
+      if(attacked(state,i,1-p.o)) v-=120;          // あぶない
+    }
+    s += p.o===o ? v : -v;
+  }
+  for(const t of state.hands[o])   s+=VAL[t]*0.9;
+  for(const t of state.hands[1-o]) s-=VAL[t]*0.9;
+  return s;
+}
+
+function search(state,depth,alpha,beta,root){
+  const me=state.turn;
+  const moves=genMoves(state,me);
+  if(!moves.length) return {score:-9999};
+  let best=null, bestScore=-1e9; const scored=[];
+  // かちすじを さきに みる
+  moves.sort((a,b)=>{
+    const ca=state.bd[a.to]?VAL[state.bd[a.to].t]:0;
+    const cb=state.bd[b.to]?VAL[state.bd[b.to].t]:0;
+    return cb-ca;
+  });
+  for(const m of moves){
+    const u=apply(state,m);
+    let sc;
+    const w=winnerAfter(state,me);
+    if(w===me) sc=100000;
+    else if(depth<=1) sc=evaluate(state,me);
+    else sc=-search(state,depth-1,-beta,-alpha,false).score;
+    unapply(state,u);
+    if(root) scored.push({m:m,sc:sc});
+    if(sc>bestScore){bestScore=sc;best=m;}
+    if(!root){
+      if(bestScore>alpha) alpha=bestScore;
+      if(alpha>=beta) break;
+    }
+  }
+  if(root){
+    scored.sort((a,b)=>b.sc-a.sc);
+    return {score:bestScore,move:best,list:scored};
+  }
+  return {score:bestScore,move:best};
+}
+
+/* ===== びょうが ===== */
+const $=id=>document.getElementById(id);
+const boardEl=$('board');
+
+function pieceHTML(p){
+  return '<div class="pc o'+p.o+'">'+EMOJI[p.t]+'</div>';
+}
+
+function render(){
+  const flip = (mode==='two' && turn===1);
+  boardEl.classList.toggle('flip',flip);
+  boardEl.innerHTML='';
+  const hi = sel ? legalTargets() : [];
+  for(let i=0;i<12;i++){
+    const d=document.createElement('div');
+    d.className='cell';
+    if(i<3) d.classList.add('goal0');
+    if(i>8) d.classList.add('goal1');
+    const p=bd[i];
+    if(p) d.innerHTML=pieceHTML(p);
+    if(sel && sel.kind==='board' && sel.idx===i) d.classList.add('sel');
+    if(hi.includes(i)){ d.classList.add('hi'); if(p) d.classList.add('has'); }
+    if(lastMove && (lastMove.to===i || lastMove.from===i)) d.classList.add('last');
+    d.onclick=()=>tapCell(i);
+    boardEl.appendChild(d);
+  }
+  // したがわ = いま ばんの ひと（ふたりで あそぶ とき）
+  const bottomOwner = flip ? 1 : 0;
+  renderHand(bottomOwner,'hand0'); renderHand(1-bottomOwner,'hand1');
+  const nm = o => mode==='two' ? (o===0?'あお🔵の もちごま':'あか🔴の もちごま')
+                               : (o===0?'きみの もちごま':'コンピュータの もちごま');
+  $('lab0').textContent = nm(bottomOwner);
+  $('lab1').textContent = nm(1-bottomOwner);
+  const m=$('msg');
+  if(over){
+    m.textContent=over.text; m.className='';
+  }else if(mode==='two'){
+    m.textContent = turn===0?'あお🔵の ばん':'あか🔴の ばん';
+    m.className = turn===0?'me':'you';
+  }else{
+    m.textContent = turn===0?'きみの ばん':'コンピュータが かんがえてるよ…';
+    m.className = turn===0?'me':'you';
+  }
+}
+
+function renderHand(o,elId){
+  const el=$(elId); el.innerHTML='';
+  const counts={};
+  hands[o].forEach(t=>counts[t]=(counts[t]||0)+1);
+  Object.keys(counts).forEach(t=>{
+    const d=document.createElement('div');
+    d.className='hp o'+o;
+    if(sel && sel.kind==='hand' && sel.o===o && sel.t===t) d.classList.add('sel');
+    d.innerHTML=EMOJI[t]+(counts[t]>1?'<span class="n">×'+counts[t]+'</span>':'');
+    d.onclick=()=>tapHand(o,t);
+    el.appendChild(d);
+  });
+}
+
+function legalTargets(){
+  if(!sel) return [];
+  const st={bd:bd,hands:hands,turn:turn};
+  if(sel.kind==='board') return movesFrom(st,sel.idx);
+  const out=[]; for(let i=0;i<12;i++) if(!bd[i]) out.push(i);
+  return out;
+}
+
+/* ===== そうさ ===== */
+function myTurn(){
+  if(over||busy) return false;
+  return mode==='two' ? true : turn===0;
+}
+
+function tapHand(o,t){
+  if(!myTurn()||o!==turn) return;
+  if(sel&&sel.kind==='hand'&&sel.t===t){sel=null;}
+  else sel={kind:'hand',o:o,t:t};
+  render();
+}
+
+function tapCell(i){
+  if(!myTurn()) return;
+  const p=bd[i];
+  if(sel){
+    if(legalTargets().includes(i)){
+      doMove(sel.kind==='board'?{from:sel.idx,to:i}:{drop:sel.t,to:i});
+      return;
+    }
+    if(p&&p.o===turn){ sel={kind:'board',idx:i}; render(); return; }
+    sel=null; render(); return;
+  }
+  if(p&&p.o===turn){ sel={kind:'board',idx:i}; render(); }
+}
+
+function snapshot(){
+  return {bd:bd.map(p=>p?{t:p.t,o:p.o}:null),hands:[hands[0].slice(),hands[1].slice()],turn:turn,last:lastMove};
+}
+
+function doMove(m){
+  hist.push(snapshot());
+  const st={bd:bd,hands:hands,turn:turn};
+  apply(st,m);
+  bd=st.bd; hands=st.hands;
+  const mover=turn;
+  turn=st.turn;
+  lastMove={from:m.from,to:m.to};
+  sel=null;
+  const w=winnerAfter({bd:bd,hands:hands,turn:turn},mover);
+  if(w!==null){ finish(w); return; }
+  render();
+  if(mode==='cpu'&&turn===1) cpuMove();
+}
+
+function finish(w){
+  let text;
+  if(mode==='two') text = (w===0?'あお🔵の かち！':'あか🔴の かち！');
+  else text = (w===0?'🎉 きみの かち！':'コンピュータの かち…');
+  over={w:w,text:text};
+  render();
+  setTimeout(()=>{
+    showOverlay(text, mode==='two'?'つよいね！':(w===0?'おめでとう！つぎも やってみよう':'つぎは かてるよ！'), true);
+  },600);
+}
+
+function cpuMove(){
+  busy=true; render();
+  setTimeout(()=>{
+    const st={bd:bd.map(p=>p?{t:p.t,o:p.o}:null),hands:[hands[0].slice(),hands[1].slice()],turn:1};
+    const depth = CPU_DEPTH;
+    const r=search(st,depth,-1e9,1e9,true);
+    busy=false;
+    let pick=r.move;
+    if(r.list && r.list.length){
+      const n=Math.min(CPU_SLOPPY,r.list.length);
+      pick=r.list[Math.floor(Math.random()*n)].m;
+      if(r.list[0].sc>=90000) pick=r.list[0].m;   // かちすじは のがさない
+    }
+    if(pick) doMove(pick);
+    else { finish(0); }
+  },420);
+}
+
+let CPU_DEPTH=4, CPU_SLOPPY=1;
+
+/* ===== ボタン ===== */
+$('undo').onclick=()=>{
+  if(busy) return;
+  let n = (mode==='cpu')?2:1;
+  while(n-->0 && hist.length){
+    const s=hist.pop();
+    bd=s.bd; hands=s.hands; turn=s.turn; lastMove=s.last;
+  }
+  over=null; sel=null; render();
+};
+$('again').onclick=()=>startMenu();
+
+function showOverlay(title,text,restart){
+  $('ovt').textContent=title;
+  $('ovp').innerHTML=text;
+  const b=$('ovbtns'); b.innerHTML='';
+  const mk=(label,fn,sub)=>{const x=document.createElement('button');x.textContent=label;if(sub)x.className='sub';x.onclick=fn;b.appendChild(x);};
+  if(restart){
+    mk('もういちど',()=>{initGame();$('overlay').classList.add('hide');render();if(mode==='cpu'&&turn===1)cpuMove();});
+    mk('さいしょの がめんへ',()=>startMenu(),true);
+  }else{
+    mk('ひとりで あそぶ 🐤よわい',()=>begin('cpu',2,3));
+    mk('ひとりで あそぶ 🐔ふつう',()=>begin('cpu',4,2));
+    mk('ひとりで あそぶ 🦁つよい',()=>begin('cpu',6,1));
+    mk('ふたりで あそぶ（2にん）',()=>begin('two',0),true);
+  }
+  $('overlay').classList.remove('hide');
+}
+
+function begin(m,d,sloppy){
+  mode=m; CPU_DEPTH=d; CPU_SLOPPY=sloppy||1;
+  initGame();
+  $('overlay').classList.add('hide');
+  render();
+}
+
+function startMenu(){
+  showOverlay('どうぶつしょうぎ','あいての 🦁ライオンを とったら かち！<br>じぶんの 🦁が いちばん おくに ついても かち！',false);
+}
+
+startMenu();
+</script>
+</body>
+</html>
