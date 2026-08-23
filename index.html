@@ -79,7 +79,9 @@ button{
   border:none;background:#f0a04b;color:#fff;font-weight:bold;box-shadow:0 3px 0 #c37b2d;
 }
 button:active{transform:translateY(2px);box-shadow:0 1px 0 #c37b2d;}
-button.sub{background:#9ab3c9;box-shadow:0 3px 0 #74879a;}
+button.sub,label.sub{background:#9ab3c9;box-shadow:0 3px 0 #74879a;}
+label.sub{font-family:inherit;font-size:16px;padding:10px 16px;border-radius:12px;color:#fff;font-weight:bold;}
+label.sub:active{transform:translateY(2px);box-shadow:0 1px 0 #74879a;}
 
 #overlay{
   position:fixed;inset:0;background:#fdf6e3;
@@ -202,7 +204,17 @@ h3.sec-title{font-size:14px;margin:4px 0 8px;text-align:left;opacity:.75;}
     <div id="cpuRankBox"></div>
     <h3 class="sec-title">さいきんの たいせん（タップで ばんめんを みる）</h3>
     <div id="historyList"></div>
+    <h3 class="sec-title">💾 きろくの バックアップ</h3>
+    <div class="rank-empty" style="padding-top:0;">きろくは この たんまつだけに ほぞんされています。きえるのが しんぱいな ときは 書き出しておくと あんしんです</div>
     <div class="ov2-btns">
+      <button id="exportBtn" class="sub">📤 書き出す</button>
+      <label class="sub" id="importBtnLabel" style="display:flex;align-items:center;justify-content:center;cursor:pointer;">
+        📥 読み込む
+        <input type="file" id="importInput" accept="application/json,.json" style="display:none;">
+      </label>
+    </div>
+    <div id="backupCheck" style="text-align:center;font-size:12px;opacity:.65;margin-top:6px;"></div>
+    <div class="ov2-btns" style="margin-top:14px;">
       <button id="historyCloseBtn">とじる</button>
       <button id="clearHistoryBtn" class="sub">きろくを ぜんぶ けす</button>
     </div>
@@ -761,6 +773,48 @@ $('clearHistoryBtn').onclick=()=>{
     openHistory();
   }
 };
+
+/* ===== バックアップ（書き出し／読み込み） ===== */
+function pad2(n){ return String(n).padStart(2,'0'); }
+
+$('exportBtn').onclick=()=>{
+  const data={
+    app:'doubutsuShogi', version:1, exportedAt:new Date().toISOString(),
+    names: loadNames(), history: loadHistory()
+  };
+  const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const d=new Date();
+  const fname=`どうぶつしょうぎ_バックアップ_${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}.json`;
+  const a=document.createElement('a');
+  a.href=url; a.download=fname;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  $('backupCheck').textContent='✅ '+fname+' を 書き出しました';
+};
+
+$('importInput').addEventListener('change',(e)=>{
+  const file=e.target.files[0];
+  e.target.value='';
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    let data;
+    try{ data=JSON.parse(reader.result); }
+    catch(err){ $('backupCheck').textContent='⚠️ この ファイルは よみこめませんでした'; return; }
+    if(!data || data.app!=='doubutsuShogi' || !Array.isArray(data.history)){
+      $('backupCheck').textContent='⚠️ どうぶつしょうぎの バックアップ ファイルでは ないようです';
+      return;
+    }
+    if(!confirm('いまの きろく・なまえを、よみこんだ データで じょうがきします。よろしいですか？')) return;
+    localStorage.setItem(DS_HISTORY, JSON.stringify(data.history));
+    if(data.names) localStorage.setItem(DS_NAMES, JSON.stringify(data.names));
+    $('backupCheck').textContent='✅ よみこみました';
+    openHistory();
+  };
+  reader.onerror=()=>{ $('backupCheck').textContent='⚠️ ファイルを よみこめませんでした'; };
+  reader.readAsText(file);
+});
 
 function openReplay(h){
   $('replayTitle').textContent = h.mode==='two'
