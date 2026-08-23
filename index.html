@@ -65,6 +65,13 @@ h1{font-size:22px;margin:6px 0 2px;letter-spacing:2px;}
 }
 .cell.hi.has::after{width:100%;height:100%;border-radius:4px;opacity:.45;}
 .cell.last{outline:3px solid #ff9f43;outline-offset:-3px;}
+.cell.hint-from{outline:3px dashed #ffb703;outline-offset:-3px;}
+.cell.hint-to::before{
+  content:"⭐";position:absolute;font-size:16px;top:1px;right:1px;
+  animation:hintPulse 1s ease-in-out infinite;z-index:2;
+}
+@keyframes hintPulse{0%,100%{transform:scale(1);opacity:.85;}50%{transform:scale(1.25);opacity:1;}}
+.hp.hint-from{outline:3px dashed #ffb703;outline-offset:-3px;}
 
 #ctrl{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;justify-content:center;}
 button{
@@ -157,6 +164,7 @@ h3.sec-title{font-size:14px;margin:4px 0 8px;text-align:left;opacity:.75;}
 <p class="hand-label" id="lab0">じぶんの もちごま</p>
 
 <div id="ctrl">
+  <button id="hint" class="sub">💡 つぎの いって</button>
   <button id="undo" class="sub">まった</button>
   <button id="history" class="sub">📜 きろく</button>
   <button id="again" class="sub">さいしょから</button>
@@ -230,7 +238,7 @@ const MOVES={
   H:[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]]
 };
 
-let bd, hands, turn, hist, mode, over, sel, lastMove, busy, moveCount;
+let bd, hands, turn, hist, mode, over, sel, lastMove, busy, moveCount, hintMove;
 let p0Name='あお', p1Name='あか', cpuLabel='コンピュータ';
 
 function initGame(){
@@ -241,7 +249,7 @@ function initGame(){
   put(7,'C',0);
   put(9,'E',0); put(10,'L',0); put(11,'G',0);
   hands=[[],[]];
-  turn=0; over=null; sel=null; lastMove=null; hist=[]; busy=false; moveCount=0;
+  turn=0; over=null; sel=null; lastMove=null; hist=[]; busy=false; moveCount=0; hintMove=null;
 }
 
 /* ===== ルール ===== */
@@ -418,6 +426,10 @@ function render(){
     if(sel && sel.kind==='board' && sel.idx===i) d.classList.add('sel');
     if(hi.includes(i)){ d.classList.add('hi'); if(p) d.classList.add('has'); }
     if(lastMove && (lastMove.to===i || lastMove.from===i)) d.classList.add('last');
+    if(hintMove){
+      if(hintMove.from===i) d.classList.add('hint-from');
+      if(hintMove.to===i) d.classList.add('hint-to');
+    }
     d.onclick=()=>tapCell(i);
     boardEl.appendChild(d);
   }
@@ -436,6 +448,7 @@ function render(){
     m.textContent = turn===0?`${p0Name}の ばん`:'コンピュータが かんがえてるよ…';
     m.className = turn===0?'me':'you';
   }
+  if(hintMove && !over) m.textContent += '　💡⭐が おすすめ！';
 }
 
 function renderHand(o,elId){
@@ -446,6 +459,7 @@ function renderHand(o,elId){
     const d=document.createElement('div');
     d.className='hp o'+o;
     if(sel && sel.kind==='hand' && sel.o===o && sel.t===t) d.classList.add('sel');
+    if(hintMove && hintMove.drop===t && o===turn) d.classList.add('hint-from');
     d.innerHTML=EMOJI[t]+(counts[t]>1?'<span class="n">×'+counts[t]+'</span>':'');
     d.onclick=()=>tapHand(o,t);
     el.appendChild(d);
@@ -468,6 +482,7 @@ function myTurn(){
 
 function tapHand(o,t){
   if(!myTurn()||o!==turn) return;
+  hintMove=null;
   if(sel&&sel.kind==='hand'&&sel.t===t){sel=null;}
   else sel={kind:'hand',o:o,t:t};
   render();
@@ -481,9 +496,11 @@ function tapCell(i){
       doMove(sel.kind==='board'?{from:sel.idx,to:i}:{drop:sel.t,to:i});
       return;
     }
+    hintMove=null;
     if(p&&p.o===turn){ sel={kind:'board',idx:i}; render(); return; }
     sel=null; render(); return;
   }
+  hintMove=null;
   if(p&&p.o===turn){ sel={kind:'board',idx:i}; render(); }
 }
 
@@ -499,7 +516,7 @@ function doMove(m){
   const mover=turn;
   turn=st.turn;
   lastMove={from:m.from,to:m.to};
-  sel=null;
+  sel=null; hintMove=null;
   moveCount++;
   const w=winnerAfter({bd:bd,hands:hands,turn:turn},mover);
   if(w!==null){
@@ -550,7 +567,20 @@ function cpuMove(){
 
 let CPU_DEPTH=4, CPU_SLOPPY=1;
 
+/* ===== ヒント（つぎの いって） ===== */
+const HINT_DEPTH=5;
+function showHint(){
+  if(!myTurn()) return;
+  const st={bd:bd.map(p=>p?{t:p.t,o:p.o}:null),hands:[hands[0].slice(),hands[1].slice()],turn:turn};
+  const r=search(st,HINT_DEPTH,-1e9,1e9,true);
+  if(!r.move) return;
+  hintMove=r.move;
+  sel = (hintMove.from!==undefined) ? {kind:'board',idx:hintMove.from} : {kind:'hand',o:turn,t:hintMove.drop};
+  render();
+}
+
 /* ===== ボタン ===== */
+$('hint').onclick=()=>showHint();
 $('undo').onclick=()=>{
   if(busy) return;
   let n = (mode==='cpu')?2:1;
@@ -558,7 +588,7 @@ $('undo').onclick=()=>{
     const s=hist.pop();
     bd=s.bd; hands=s.hands; turn=s.turn; lastMove=s.last;
   }
-  over=null; sel=null; render();
+  over=null; sel=null; hintMove=null; render();
 };
 $('again').onclick=()=>startMenu();
 
