@@ -258,9 +258,9 @@ const MOVES={
   H:[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]]
 };
 
-let bd, hands, turn, hist, mode, over, sel, lastMove, busy, moveCount, hintMove, hintFor, hintsLeft;
+let bd, hands, turn, hist, mode, over, sel, lastMove, busy, moveCount, hintMove, hintFor, hintsLeft, undoLeft;
 let p0Name='あお', p1Name='あか', cpuLabel='コンピュータ';
-const HINT_MAX=3;
+const HINT_MAX=3, UNDO_MAX=3;
 
 function initGame(){
   bd=new Array(12).fill(null);
@@ -272,6 +272,7 @@ function initGame(){
   hands=[[],[]];
   turn=0; over=null; sel=null; lastMove=null; hist=[]; busy=false; moveCount=0; hintMove=null; hintFor=null;
   hintsLeft=[HINT_MAX,HINT_MAX];
+  undoLeft=[UNDO_MAX,UNDO_MAX];
 }
 
 /* ===== ルール ===== */
@@ -475,6 +476,8 @@ function render(){
   $('ctrl1').classList.toggle('show', mode==='two');
   updateHintBtn($('hint'),0);
   updateHintBtn($('hint1'),1);
+  updateUndoBtn($('undo'),0);
+  updateUndoBtn($('undo1'),1);
 }
 
 function updateHintBtn(btn,o){
@@ -482,6 +485,17 @@ function updateHintBtn(btn,o){
   btn.textContent = '💡 つぎの いって（のこり'+Math.max(left,0)+'）';
   const usable = !over && !busy && (mode==='two' ? turn===o : (o===0 && turn===0));
   btn.disabled = !usable || left<=0;
+}
+
+function updateUndoBtn(btn,o){
+  if(mode!=='two'){
+    btn.textContent='まった';
+    btn.disabled = over || busy || !hist.length;
+    return;
+  }
+  const left=undoLeft[o];
+  btn.textContent='まった（のこり'+Math.max(left,0)+'）';
+  btn.disabled = over || busy || !hist.length || left<=0;
 }
 
 function renderHand(o,elId){
@@ -619,8 +633,12 @@ function showHint(o){
 /* ===== ボタン ===== */
 $('hint').onclick=()=>showHint(0);
 $('hint1').onclick=()=>showHint(1);
-function doUndo(){
-  if(busy) return;
+function doUndo(o){
+  if(busy||!hist.length) return;
+  if(mode==='two'){
+    if(undoLeft[o]<=0) return;
+    undoLeft[o]--;
+  }
   let n = (mode==='cpu')?2:1;
   while(n-->0 && hist.length){
     const s=hist.pop();
@@ -628,8 +646,8 @@ function doUndo(){
   }
   over=null; sel=null; hintMove=null; hintFor=null; render();
 }
-$('undo').onclick=doUndo;
-$('undo1').onclick=doUndo;
+$('undo').onclick=()=>doUndo(0);
+$('undo1').onclick=()=>doUndo(1);
 $('again').onclick=()=>startMenu();
 
 function showOverlay(title,text,restart){
