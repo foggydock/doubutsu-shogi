@@ -74,6 +74,9 @@ h1{font-size:22px;margin:6px 0 2px;letter-spacing:2px;}
 .hp.hint-from{outline:3px dashed #ffb703;outline-offset:-3px;}
 
 #ctrl{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;justify-content:center;}
+#ctrl1{display:none;gap:8px;margin-bottom:4px;flex-wrap:wrap;justify-content:center;transform:rotate(180deg);}
+#ctrl1.show{display:flex;}
+button:disabled{opacity:.4;}
 button{
   font-family:inherit;font-size:16px;padding:10px 16px;border-radius:12px;
   border:none;background:#f0a04b;color:#fff;font-weight:bold;box-shadow:0 3px 0 #c37b2d;
@@ -156,6 +159,11 @@ h3.sec-title{font-size:14px;margin:4px 0 8px;text-align:left;opacity:.75;}
 
 <h1>どうぶつしょうぎ</h1>
 <div id="msg"></div>
+
+<div id="ctrl1">
+  <button id="hint1" class="sub">💡 つぎの いって</button>
+  <button id="undo1" class="sub">まった</button>
+</div>
 
 <p class="hand-label" id="lab1">あいての もちごま</p>
 <div id="hand1"></div>
@@ -250,8 +258,9 @@ const MOVES={
   H:[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]]
 };
 
-let bd, hands, turn, hist, mode, over, sel, lastMove, busy, moveCount, hintMove;
+let bd, hands, turn, hist, mode, over, sel, lastMove, busy, moveCount, hintMove, hintFor, hintsLeft;
 let p0Name='あお', p1Name='あか', cpuLabel='コンピュータ';
+const HINT_MAX=3;
 
 function initGame(){
   bd=new Array(12).fill(null);
@@ -261,7 +270,8 @@ function initGame(){
   put(7,'C',0);
   put(9,'E',0); put(10,'L',0); put(11,'G',0);
   hands=[[],[]];
-  turn=0; over=null; sel=null; lastMove=null; hist=[]; busy=false; moveCount=0; hintMove=null;
+  turn=0; over=null; sel=null; lastMove=null; hist=[]; busy=false; moveCount=0; hintMove=null; hintFor=null;
+  hintsLeft=[HINT_MAX,HINT_MAX];
 }
 
 /* ===== ルール ===== */
@@ -461,6 +471,17 @@ function render(){
     m.className = turn===0?'me':'you';
   }
   if(hintMove && !over) m.textContent += '　💡⭐が おすすめ！';
+
+  $('ctrl1').classList.toggle('show', mode==='two');
+  updateHintBtn($('hint'),0);
+  updateHintBtn($('hint1'),1);
+}
+
+function updateHintBtn(btn,o){
+  const left=hintsLeft[o];
+  btn.textContent = '💡 つぎの いって（のこり'+Math.max(left,0)+'）';
+  const usable = !over && !busy && (mode==='two' ? turn===o : (o===0 && turn===0));
+  btn.disabled = !usable || left<=0;
 }
 
 function renderHand(o,elId){
@@ -581,27 +602,34 @@ let CPU_DEPTH=4, CPU_SLOPPY=1;
 
 /* ===== ヒント（つぎの いって） ===== */
 const HINT_DEPTH=5;
-function showHint(){
-  if(!myTurn()) return;
+function showHint(o){
+  if(over||busy) return;
+  const canUse = mode==='two' ? turn===o : (o===0 && turn===0);
+  if(!canUse) return;
+  if(hintsLeft[o]<=0) return;
   const st={bd:bd.map(p=>p?{t:p.t,o:p.o}:null),hands:[hands[0].slice(),hands[1].slice()],turn:turn};
   const r=search(st,HINT_DEPTH,-1e9,1e9,true);
   if(!r.move) return;
-  hintMove=r.move;
+  hintsLeft[o]--;
+  hintMove=r.move; hintFor=o;
   sel = (hintMove.from!==undefined) ? {kind:'board',idx:hintMove.from} : {kind:'hand',o:turn,t:hintMove.drop};
   render();
 }
 
 /* ===== ボタン ===== */
-$('hint').onclick=()=>showHint();
-$('undo').onclick=()=>{
+$('hint').onclick=()=>showHint(0);
+$('hint1').onclick=()=>showHint(1);
+function doUndo(){
   if(busy) return;
   let n = (mode==='cpu')?2:1;
   while(n-->0 && hist.length){
     const s=hist.pop();
     bd=s.bd; hands=s.hands; turn=s.turn; lastMove=s.last;
   }
-  over=null; sel=null; hintMove=null; render();
-};
+  over=null; sel=null; hintMove=null; hintFor=null; render();
+}
+$('undo').onclick=doUndo;
+$('undo1').onclick=doUndo;
 $('again').onclick=()=>startMenu();
 
 function showOverlay(title,text,restart){
