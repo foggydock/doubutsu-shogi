@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#e8c98a">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png" type="image/png">
 <title>どうぶつしょうぎ</title>
 <style>
 :root{
@@ -140,6 +145,12 @@ h3.sec-title{font-size:14px;margin:4px 0 8px;text-align:left;opacity:.75;}
 .h-names span.win{font-weight:bold;}
 .h-date{opacity:.55;font-size:11px;white-space:nowrap;}
 .h-sub{opacity:.6;font-size:11px;}
+#offline{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  background:#9ab3c9;color:#fff;font-size:12px;font-weight:bold;
+  text-align:center;padding:4px 8px;display:none;
+}
+#offline.show{display:block;}
 #historyCloseBtn{margin-top:14px;}
 #clearHistoryBtn{margin-top:8px;}
 
@@ -223,6 +234,8 @@ h3.sec-title{font-size:14px;margin:4px 0 8px;text-align:left;opacity:.75;}
     </div>
   </div>
 </div>
+
+<div id="offline">📴 オフラインです（あそべます）</div>
 
 <div id="replayOverlay" class="ov2">
   <div class="ov2-card">
@@ -987,6 +1000,19 @@ function openReplay(h){
 $('replayCloseBtn').onclick=()=>{ $('replayOverlay').classList.remove('active'); };
 
 startMenu();
+
+/* ===== オフラインでも あそべるように する ===== */
+// Service Worker は HTMLを「ネットワークゆうせん」で とりにいくので、
+// つながる ときは かならず さいしんが よみこまれる（sw.js の コメント さんしょう）。
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});   // つかえなくても ゲームは うごく
+  });
+}
+function updateOffline(){ $('offline').classList.toggle('show', !navigator.onLine); }
+window.addEventListener('online', updateOffline);
+window.addEventListener('offline', updateOffline);
+updateOffline();
 </script>
 </body>
 </html>
