@@ -21,9 +21,11 @@ body{
   background:var(--bg); color:#3a2c14;
   font-family:"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN",sans-serif;
   display:flex; flex-direction:column; align-items:center;
-  padding:env(safe-area-inset-top) 8px 8px; overflow:hidden;
+  padding:env(safe-area-inset-top) 8px calc(8px + env(safe-area-inset-bottom)); overflow:hidden;
   user-select:none; -webkit-user-select:none;
 }
+/* ばん いがいは ちぢめない。あまった たかさは #boardWrap に あつめて ばんに まわす（fitBoard） */
+body>*,#boardWrap>*{flex-shrink:0;}
 h1{font-size:22px;margin:6px 0 2px;letter-spacing:2px;}
 #msg{font-size:20px;font-weight:bold;min-height:28px;margin:2px 0 4px;text-align:center;}
 #msg.me{color:var(--me);} #msg.you{color:var(--you);}
@@ -42,12 +44,17 @@ h1{font-size:22px;margin:6px 0 2px;letter-spacing:2px;}
 .hp.sel{background:var(--sel);}
 .hp .n{font-size:11px;}
 
+#boardWrap{
+  flex:1 1 0;min-height:0;width:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
 #board,#replayBoard{
   display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(4,1fr);
   gap:3px;background:var(--line);padding:3px;border-radius:8px;
   aspect-ratio:3/4;
 }
-#board{width:min(86vw, 55vh * 0.75, 430px);}
+/* はばは fitBoard() が のこりの たかさから きめる。ここの width は そのまえの しょきち、max-width が うえの げんかい */
+#board{width:min(86vw, 55vh * 0.75, 430px);max-width:min(86vw, 430px);}
 .cell{
   background:var(--board);border-radius:4px;position:relative;
   display:flex;align-items:center;justify-content:center;font-size:clamp(26px,8vw,40px);
@@ -75,18 +82,24 @@ h1{font-size:22px;margin:6px 0 2px;letter-spacing:2px;}
 @keyframes hintPulse{0%,100%{transform:scale(1);opacity:.85;}50%{transform:scale(1.25);opacity:1;}}
 .hp.hint-from{outline:3px dashed #ffb703;outline-offset:-3px;}
 
-#ctrl{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;justify-content:center;}
-#ctrl1{display:none;gap:8px;margin-bottom:4px;flex-wrap:wrap;justify-content:center;transform:rotate(180deg);}
-#ctrl1.show{display:flex;}
-button:disabled{opacity:.4;}
-button{
+button,label.btn{
   font-family:inherit;font-size:16px;padding:10px 16px;border-radius:12px;
   border:none;background:#f0a04b;color:#fff;font-weight:bold;box-shadow:0 3px 0 #c37b2d;
 }
-button:active{transform:translateY(2px);box-shadow:0 1px 0 #c37b2d;}
+button:active,label.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #c37b2d;}
 button.sub,label.sub{background:#9ab3c9;box-shadow:0 3px 0 #74879a;}
-label.sub{font-family:inherit;font-size:16px;padding:10px 16px;border-radius:12px;color:#fff;font-weight:bold;}
-label.sub:active{transform:translateY(2px);box-shadow:0 1px 0 #74879a;}
+button.sub:active,label.sub:active{box-shadow:0 1px 0 #74879a;}
+button:disabled{opacity:.4;}
+
+#ctrl{display:flex;gap:6px 8px;margin-top:6px;flex-wrap:wrap;justify-content:center;}
+#ctrl1{display:none;gap:6px 8px;margin-bottom:4px;flex-wrap:wrap;justify-content:center;transform:rotate(180deg);}
+#ctrl1.show{display:flex;}
+#ctrl button,#ctrl1 button{font-size:15px;padding:8px 12px;}
+/* のこり かいすうは ちいさな バッジに して、ボタンが おりかえさない はばに おさめる */
+.cnt{
+  display:inline-block;margin-left:6px;padding:1px 6px;border-radius:9px;vertical-align:1px;
+  background:rgba(255,255,255,.85);color:#5d7187;font-size:11px;
+}
 
 #overlay{
   position:fixed;inset:0;background:#fdf6e3;
@@ -97,7 +110,7 @@ label.sub:active{transform:translateY(2px);box-shadow:0 1px 0 #74879a;}
 #ovbtns button{font-size:18px;padding:14px 16px;}
 #overlay.hide{display:none;}
 #overlay h2{font-size:26px;margin:0;}
-#overlay p{font-size:16px;margin:0;line-height:1.7;}
+#overlay p{font-size:16px;margin:0;line-height:1.7;white-space:pre-line;}
 #rules{font-size:14px;text-align:left;max-width:330px;background:#fff8e7;padding:14px;border-radius:12px;}
 #rules b{display:inline-block;width:5.2em;}
 
@@ -145,20 +158,27 @@ h3.sec-title{font-size:14px;margin:4px 0 8px;text-align:left;opacity:.75;}
 .h-names span.win{font-weight:bold;}
 .h-date{opacity:.55;font-size:11px;white-space:nowrap;}
 .h-sub{opacity:.6;font-size:11px;}
+.backup-note{padding-top:0;}
+#importBtnLabel{display:flex;align-items:center;justify-content:center;cursor:pointer;}
+#importInput{display:none;}
+#backupCheck{text-align:center;font-size:12px;opacity:.65;margin-top:6px;}
+/* 「とじる」と「ぜんぶ けす」は おしまちがえないように はなす */
+.ov2-btns.hist-foot{margin-top:28px;gap:16px;}
+
+/* きろく さいせい（さいごの ばんめん） */
+#replayBoard{width:220px;margin:6px auto;}
+#replayBoard .cell{font-size:22px;}
+#replayBoard .cell .pc{border-radius:6px;border-width:2px;}
+.replay-hand{display:flex;gap:4px;justify-content:center;min-height:34px;}
+.replay-hand .hp{width:32px;height:32px;font-size:17px;border-width:2px;border-radius:8px;box-shadow:none;}
+.replay-hand .hp .n{font-size:9px;}
+
 #offline{
   position:fixed;left:0;right:0;bottom:0;z-index:30;
   background:#9ab3c9;color:#fff;font-size:12px;font-weight:bold;
   text-align:center;padding:4px 8px;display:none;
 }
 #offline.show{display:block;}
-#historyCloseBtn{margin-top:14px;}
-#clearHistoryBtn{margin-top:8px;}
-
-/* きろく さいせい（さいごの ばんめん） */
-#replayOverlay .ov2-card{max-width:340px;}
-#replayBoard{width:220px;margin:10px auto;}
-#replayBoard .cell{font-size:22px;}
-#replayBoard .cell .pc{border-radius:6px;border-width:2px;}
 </style>
 </head>
 <body>
@@ -171,13 +191,13 @@ h3.sec-title{font-size:14px;margin:4px 0 8px;text-align:left;opacity:.75;}
   <button id="undo1" class="sub">まった</button>
 </div>
 
-<p class="hand-label" id="lab1">あいての もちごま</p>
-<div id="hand1"></div>
-
-<div id="board"></div>
-
-<div id="hand0"></div>
-<p class="hand-label" id="lab0">じぶんの もちごま</p>
+<div id="boardWrap">
+  <p class="hand-label" id="lab1">あいての もちごま</p>
+  <div id="hand1"></div>
+  <div id="board"></div>
+  <div id="hand0"></div>
+  <p class="hand-label" id="lab0">じぶんの もちごま</p>
+</div>
 
 <div id="ctrl">
   <button id="hint" class="sub">💡 つぎの いって</button>
@@ -219,16 +239,16 @@ h3.sec-title{font-size:14px;margin:4px 0 8px;text-align:left;opacity:.75;}
     <h3 class="sec-title">さいきんの たいせん（タップで ばんめんを みる）</h3>
     <div id="historyList"></div>
     <h3 class="sec-title">💾 きろくの バックアップ</h3>
-    <div class="rank-empty" style="padding-top:0;">きろくは この たんまつだけに ほぞんされています。きえるのが しんぱいな ときは 書き出しておくと あんしんです</div>
+    <div class="rank-empty backup-note" id="backupNote"></div>
     <div class="ov2-btns">
       <button id="exportBtn" class="sub">📤 書き出す</button>
-      <label class="sub" id="importBtnLabel" style="display:flex;align-items:center;justify-content:center;cursor:pointer;">
+      <label class="btn sub" id="importBtnLabel">
         📥 読み込む
-        <input type="file" id="importInput" accept="application/json,.json" style="display:none;">
+        <input type="file" id="importInput" accept="application/json,.json">
       </label>
     </div>
-    <div id="backupCheck" style="text-align:center;font-size:12px;opacity:.65;margin-top:6px;"></div>
-    <div class="ov2-btns" style="margin-top:14px;">
+    <div id="backupCheck"></div>
+    <div class="ov2-btns hist-foot">
       <button id="historyCloseBtn">とじる</button>
       <button id="clearHistoryBtn" class="sub">きろくを ぜんぶ けす</button>
     </div>
@@ -241,7 +261,9 @@ h3.sec-title{font-size:14px;margin:4px 0 8px;text-align:left;opacity:.75;}
   <div class="ov2-card">
     <h2 id="replayTitle"></h2>
     <div id="replaySub" class="h-sub"></div>
+    <div id="replayHand1" class="replay-hand"></div>
     <div id="replayBoard"></div>
+    <div id="replayHand0" class="replay-hand"></div>
     <div class="ov2-btns">
       <button id="replayCloseBtn" class="sub">とじる</button>
     </div>
@@ -266,10 +288,15 @@ const MOVES={
 };
 
 let bd, hands, turn, hist, mode, over, sel, lastMove, busy, moveCount, hintMove, hintsLeft, undoLeft;
-let p0Name='あお', p1Name='あか';
+let cpuLevel=null;
+// ゲームが かわるたびに ふやす。まえの ゲームの タイマーが あとから うごかないように する（gameTimeout）
+let gameId=0;
+const DEFAULT_NAMES={p0:'あお', p1:'あか', solo:'きみ'};
+let p0Name=DEFAULT_NAMES.p0, p1Name=DEFAULT_NAMES.p1;
 const HINT_MAX=3, UNDO_MAX=3, REPEAT_MAX=3;
 
 function initGame(){
+  gameId++;
   bd=new Array(12).fill(null);
   const put=(i,t,o)=>bd[i]={t:t,o:o};
   put(0,'G',1); put(1,'L',1); put(2,'E',1);
@@ -280,6 +307,12 @@ function initGame(){
   turn=0; over=null; sel=null; lastMove=null; hist=[]; busy=false; moveCount=0; hintMove=null;
   hintsLeft=[HINT_MAX,HINT_MAX];
   undoLeft=[UNDO_MAX,UNDO_MAX];
+}
+
+// いまの ゲームが つづいている ときだけ うごく setTimeout
+function gameTimeout(fn,ms){
+  const id=gameId;
+  setTimeout(()=>{ if(id===gameId) fn(); },ms);
 }
 
 /* ===== きょくめんの とりあつかい ===== */
@@ -339,7 +372,7 @@ function genMoves(state,o){
   }
   // もちごまを おく
   const seen={};
-  state.hands[o].forEach((t,hi)=>{
+  state.hands[o].forEach(t=>{
     if(seen[t]) return; seen[t]=1;
     for(let i=0;i<12;i++) if(!state.bd[i]) list.push({drop:t,to:i});
   });
@@ -378,7 +411,7 @@ function unapply(state,u){
     const p=state.bd[m.to];
     if(u.promo) p.t='C';
     state.bd[m.from]=p;
-    state.bd[m.to]=u.cap||null;
+    state.bd[m.to]=u.cap;
     if(u.cap){
       const t=u.cap.t==='H'?'C':u.cap.t;
       const hi=state.hands[state.turn].lastIndexOf(t);
@@ -402,18 +435,20 @@ function winnerAfter(state,o){
 }
 
 /* ===== CPU ===== */
+// かったときの てん。search では のこりの depth を たして「はやく かてる て」ほど たかく する
+const WIN_SCORE=100000;
+
 function evaluate(state,o){
   let s=0;
   for(let i=0;i<12;i++){
     const p=state.bd[i]; if(!p) continue;
+    const adv = p.o===0 ? 3-(i/3|0) : (i/3|0);     // あいてがわへ どれだけ すすんだか
     let v=VAL[p.t];
-    if(p.t!=='L'){
-      const adv = p.o===0 ? (3-(i/3|0)) : (i/3|0);
-      v += adv*3;
-    }else{
-      const adv = p.o===0 ? (3-(i/3|0)) : (i/3|0);
+    if(p.t==='L'){
       v += adv*6;                                  // トライを めざす
       if(attacked(state,i,1-p.o)) v-=120;          // あぶない
+    }else{
+      v += adv*3;
     }
     s += p.o===o ? v : -v;
   }
@@ -425,7 +460,8 @@ function evaluate(state,o){
 function search(state,depth,alpha,beta,root){
   const me=state.turn;
   const moves=genMoves(state,me);
-  if(!moves.length) return {score:-9999};
+  // うごけない＝まけ。1て まえに あいてが その ばで かった ときと おなじ てんに そろえる
+  if(!moves.length) return {score:-(WIN_SCORE+depth+1)};
   let best=null, bestScore=-1e9; const scored=[];
   // かちすじを さきに みる
   moves.sort((a,b)=>{
@@ -436,8 +472,8 @@ function search(state,depth,alpha,beta,root){
   for(const m of moves){
     const u=apply(state,m);
     let sc;
-    const w=winnerAfter(state,me);
-    if(w===me) sc=100000;
+    // すぐ かてる て（のこりの depth が おおきい）ほど たかい。とおまわりの かちを えらばないように
+    if(winnerAfter(state,me)===me) sc=WIN_SCORE+depth;
     else if(depth<=1) sc=evaluate(state,me);
     else sc=-search(state,depth-1,-beta,-alpha,false).score;
     unapply(state,u);
@@ -452,7 +488,7 @@ function search(state,depth,alpha,beta,root){
     scored.sort((a,b)=>b.sc-a.sc);
     return {score:bestScore,move:best,list:scored};
   }
-  return {score:bestScore,move:best};
+  return {score:bestScore};
 }
 
 /* ===== びょうが ===== */
@@ -463,16 +499,40 @@ function pieceHTML(p){
   return '<div class="pc o'+p.o+'">'+EMOJI[p.t]+'</div>';
 }
 
+// ばんの 1ます（じんちの いろ・コマ つき）。ゲームの ばんと きろくの ばんで つかう
+function makeCell(i,p){
+  const d=document.createElement('div');
+  d.className='cell'+(i<3?' goal0':'')+(i>8?' goal1':'');
+  if(p) d.innerHTML=pieceHTML(p);
+  return d;
+}
+
+// もちごまを しゅるいごとに 1つ（2まい いじょうは ×かず）ならべる。deco で えらんだ いろや タップを つける
+function fillHand(el,list,o,deco){
+  el.innerHTML='';
+  const counts={};
+  list.forEach(t=>counts[t]=(counts[t]||0)+1);
+  Object.keys(counts).forEach(t=>{
+    const d=document.createElement('div');
+    d.className='hp o'+o;
+    d.innerHTML=EMOJI[t]+(counts[t]>1?'<span class="n">×'+counts[t]+'</span>':'');
+    if(deco) deco(d,t);
+    el.appendChild(d);
+  });
+}
+
+// がめんに だす なまえ。2にんの ときは どちらか わかるように いろの まるを つける
+function playerName(o){
+  if(mode==='two') return o===0 ? p0Name+'🔵' : p1Name+'🔴';
+  return o===0 ? p0Name : 'コンピュータ';
+}
+
 function render(){
   boardEl.innerHTML='';
   const hi = sel ? legalTargets() : [];
   for(let i=0;i<12;i++){
-    const d=document.createElement('div');
-    d.className='cell';
-    if(i<3) d.classList.add('goal0');
-    if(i>8) d.classList.add('goal1');
     const p=bd[i];
-    if(p) d.innerHTML=pieceHTML(p);
+    const d=makeCell(i,p);
     if(sel && sel.kind==='board' && sel.idx===i) d.classList.add('sel');
     if(hi.includes(i)){ d.classList.add('hi'); if(p) d.classList.add('has'); }
     if(lastMove && (lastMove.to===i || lastMove.from===i)) d.classList.add('last');
@@ -483,22 +543,17 @@ function render(){
     d.onclick=()=>tapCell(i);
     boardEl.appendChild(d);
   }
-  renderHand(0,'hand0'); renderHand(1,'hand1');
-  const nm = o => mode==='two' ? `${o===0?p0Name:p1Name}${o===0?'🔵':'🔴'}の もちごま`
-                               : (o===0?`${p0Name}の もちごま`:'コンピュータの もちごま');
-  $('lab0').textContent = nm(0);
-  $('lab1').textContent = nm(1);
+  renderHand(0); renderHand(1);
+  $('lab0').textContent = playerName(0)+'の もちごま';
+  $('lab1').textContent = playerName(1)+'の もちごま';
   const m=$('msg');
   if(over){
     m.textContent=over.text; m.className='';
-  }else if(mode==='two'){
-    m.textContent = turn===0?`${p0Name}🔵の ばん`:`${p1Name}🔴の ばん`;
-    m.className = turn===0?'me':'you';
   }else{
-    m.textContent = turn===0?`${p0Name}の ばん`:'コンピュータが かんがえてるよ…';
+    m.textContent = (mode==='cpu' && turn===1) ? 'コンピュータが かんがえてるよ…' : playerName(turn)+'の ばん';
     m.className = turn===0?'me':'you';
+    if(hintMove) m.textContent += '　💡⭐が おすすめ！';
   }
-  if(hintMove && !over) m.textContent += '　💡⭐が おすすめ！';
 
   $('ctrl1').classList.toggle('show', mode==='two');
   updateHintBtn($('hint'),0);
@@ -507,40 +562,45 @@ function render(){
   updateUndoBtn($('undo1'),1);
 }
 
+// ボタンの もじと「のこり かいすう」の バッジ（count が null なら バッジなし）
+function setBtnLabel(btn,label,count){
+  btn.textContent=label;
+  if(count===null) return;
+  const b=document.createElement('span');
+  b.className='cnt'; b.textContent='のこり'+Math.max(count,0);
+  btn.appendChild(b);
+}
+
+// その ひと(o)が いま ヒントを つかえるか（コンピュータせんで つかえるのは じぶん(o=0)だけ）
+function canHint(o){
+  if(over || busy || hintsLeft[o]<=0) return false;
+  return turn===o && (mode==='two' || o===0);
+}
+
 function updateHintBtn(btn,o){
-  const left=hintsLeft[o];
-  btn.textContent = '💡 つぎの いって（のこり'+Math.max(left,0)+'）';
-  const usable = !over && !busy && (mode==='two' ? turn===o : (o===0 && turn===0));
-  btn.disabled = !usable || left<=0;
+  setBtnLabel(btn,'💡 つぎの いって',hintsLeft[o]);
+  btn.disabled=!canHint(o);
 }
 
 // まった＝「いま さした ひと」が とりけす もの。
 // だから o が さした ばあい（＝つぎは あいての ばん ＝ turn!==o）だけ おせる。
+// コンピュータせんは じぶん(o=0)の ボタンだけ。かいすうの せいげんは なし
 function canUndo(o){
   if(over || busy || !hist.length) return false;
-  if(mode!=='two') return true;
-  return turn!==o && undoLeft[o]>0;
+  if(mode==='two') return turn!==o && undoLeft[o]>0;
+  return o===0;
 }
 
 function updateUndoBtn(btn,o){
-  btn.textContent = mode==='two'
-    ? 'まった（のこり'+Math.max(undoLeft[o],0)+'）'
-    : 'まった';
+  setBtnLabel(btn,'まった', mode==='two' ? undoLeft[o] : null);
   btn.disabled = !canUndo(o);
 }
 
-function renderHand(o,elId){
-  const el=$(elId); el.innerHTML='';
-  const counts={};
-  hands[o].forEach(t=>counts[t]=(counts[t]||0)+1);
-  Object.keys(counts).forEach(t=>{
-    const d=document.createElement('div');
-    d.className='hp o'+o;
+function renderHand(o){
+  fillHand($('hand'+o), hands[o], o, (d,t)=>{
     if(sel && sel.kind==='hand' && sel.o===o && sel.t===t) d.classList.add('sel');
     if(hintMove && hintMove.drop===t && o===turn) d.classList.add('hint-from');
-    d.innerHTML=EMOJI[t]+(counts[t]>1?'<span class="n">×'+counts[t]+'</span>':'');
     d.onclick=()=>tapHand(o,t);
-    el.appendChild(d);
   });
 }
 
@@ -555,31 +615,26 @@ function legalTargets(){
 /* ===== そうさ ===== */
 function myTurn(){
   if(over||busy) return false;
-  return mode==='two' ? true : turn===0;
+  return mode==='two' || turn===0;
 }
 
+// ヒントの ⭐は、ほかの ますや コマを さわっても その ての あいだ のこす
+// （けすと つかった かいすう だけ へって しまう）。けすのは doMove／doUndo／initGame
 function tapHand(o,t){
   if(!myTurn()||o!==turn) return;
-  hintMove=null;
-  if(sel&&sel.kind==='hand'&&sel.t===t){sel=null;}
-  else sel={kind:'hand',o:o,t:t};
+  sel = (sel&&sel.kind==='hand'&&sel.t===t) ? null : {kind:'hand',o:o,t:t};
   render();
 }
 
 function tapCell(i){
   if(!myTurn()) return;
-  const p=bd[i];
-  if(sel){
-    if(legalTargets().includes(i)){
-      doMove(sel.kind==='board'?{from:sel.idx,to:i}:{drop:sel.t,to:i});
-      return;
-    }
-    hintMove=null;
-    if(p&&p.o===turn){ sel={kind:'board',idx:i}; render(); return; }
-    sel=null; render(); return;
+  if(sel && legalTargets().includes(i)){
+    doMove(sel.kind==='board'?{from:sel.idx,to:i}:{drop:sel.t,to:i});
+    return;
   }
-  hintMove=null;
-  if(p&&p.o===turn){ sel={kind:'board',idx:i}; render(); }
+  const p=bd[i];
+  sel = (p&&p.o===turn) ? {kind:'board',idx:i} : null;
+  render();
 }
 
 function snapshot(){
@@ -590,21 +645,20 @@ function snapshot(){
 
 function doMove(m){
   hist.push(snapshot());
-  const st=liveState();
-  apply(st,m);
-  bd=st.bd; hands=st.hands;
   const mover=turn;
+  const st=liveState();                 // bd・hands は この なかで じかに かきかわる
+  apply(st,m);
   turn=st.turn;
   lastMove={from:m.from,to:m.to};
   sel=null; hintMove=null;
   moveCount++;
-  const w=winnerAfter(liveState(),mover);
+  const w=winnerAfter(st,mover);
   if(w!==null){
-    finish(w, lionAt(liveState(),1-w)<0 ? 'capture' : 'try');
+    finish(w, lionAt(st,1-w)<0 ? 'capture' : 'try');
     return;
   }
   // つぎの ひとが 1つも うごけない → そのひとの まけ
-  if(!genMoves(liveState(),turn).length){ finish(1-turn,'stuck'); return; }
+  if(!genMoves(st,turn).length){ finish(1-turn,'stuck'); return; }
   // おなじ ばんめんが REPEAT_MAX かい でた → ひきわけ（せんにちて）
   if(repeatCount()>=REPEAT_MAX){ finish(null,'repeat'); return; }
   render();
@@ -615,9 +669,9 @@ function doMove(m){
 function finish(w,winType){
   let text;
   if(w===null)          text='🤝 ひきわけ！';
-  else if(mode==='two') text=`${w===0?p0Name:p1Name}${w===0?'🔵':'🔴'}の かち！`;
+  else if(mode==='two') text=playerName(w)+'の かち！';
   else                  text=(w===0?'🎉 きみの かち！':'コンピュータの かち…');
-  over={w:w,text:text};
+  over={text:text};
   const snap=cloneState();
   const saved=saveHistory({
     date:new Date().toISOString(), mode:mode,
@@ -625,47 +679,42 @@ function finish(w,winType){
     finalBoard: snap.bd, finalHands: snap.hands
   });
   render();
-  setTimeout(()=>{
+  gameTimeout(()=>{
     let sub;
     if(w===null)          sub=`おなじ ばんめんが ${REPEAT_MAX}かい でたので ひきわけだよ`;
     else if(mode==='two') sub='つよいね！';
     else                  sub=(w===0?'おめでとう！つぎも やってみよう':'つぎは かてるよ！');
-    if(!saved) sub+='<br>（きろくは この たんまつに ほぞんできませんでした）';
-    showOverlay(text, sub, true);
+    if(!saved) sub+='\n（きろくは この たんまつに ほぞんできませんでした）';
+    showResult(text, sub);
   },600);
 }
 
 function cpuMove(){
   busy=true; render();
-  setTimeout(()=>{
-    const st=cloneState();
-    const r=search(st,CPU_DEPTH,-1e9,1e9,true);
+  gameTimeout(()=>{
+    // doMove で「うごける てが ある」ことは たしかめずみ なので list は からに ならない
+    const r=search(cloneState(),cpuLevel.depth,-1e9,1e9,true);
     busy=false;
-    let pick=r.move;
-    if(r.list && r.list.length){
-      const n=Math.min(CPU_SLOPPY,r.list.length);
-      pick=r.list[Math.floor(Math.random()*n)].m;
-      if(r.list[0].sc>=90000) pick=r.list[0].m;   // かちすじは のがさない
+    let pick=r.list[0].m;
+    // かちすじは のがさない。それ いがいは うえから sloppy ばんめん までの てから えらぶ（よわく する）
+    if(r.list[0].sc<WIN_SCORE){
+      pick=r.list[Math.floor(Math.random()*Math.min(cpuLevel.sloppy,r.list.length))].m;
     }
-    if(pick) doMove(pick);
-    else finish(0,'stuck');   // doMove がわで はんていずみ なので ふつう ここには こない
+    doMove(pick);
   },420);
 }
-
-let CPU_DEPTH=4, CPU_SLOPPY=1;
 
 /* ===== ヒント（つぎの いって） ===== */
 const HINT_DEPTH=5;
 function showHint(o){
-  if(over||busy) return;
-  const canUse = mode==='two' ? turn===o : (o===0 && turn===0);
-  if(!canUse) return;
-  if(hintsLeft[o]<=0) return;
-  const st=cloneState();
-  const r=search(st,HINT_DEPTH,-1e9,1e9,true);
-  if(!r.move) return;
-  hintsLeft[o]--;
-  hintMove=r.move;
+  if(!canHint(o)) return;
+  // もう でている ときは かいすうを へらさず、おすすめの コマを えらびなおす だけ
+  if(!hintMove){
+    const r=search(cloneState(),HINT_DEPTH,-1e9,1e9,true);
+    if(!r.move) return;
+    hintsLeft[o]--;
+    hintMove=r.move;
+  }
   sel = (hintMove.from!==undefined) ? {kind:'board',idx:hintMove.from} : {kind:'hand',o:turn,t:hintMove.drop};
   render();
 }
@@ -676,7 +725,7 @@ $('hint1').onclick=()=>showHint(1);
 function doUndo(o){
   if(!canUndo(o)) return;
   if(mode==='two') undoLeft[o]--;
-  let n = (mode==='cpu')?2:1;
+  let n = mode==='two' ? 1 : 2;         // コンピュータせんは コンピュータの ても いっしょに もどす
   while(n-->0 && hist.length){
     const s=hist.pop();
     bd=s.bd; hands=s.hands; turn=s.turn; lastMove=s.last; moveCount=s.moves;
@@ -687,34 +736,49 @@ $('undo').onclick=()=>doUndo(0);
 $('undo1').onclick=()=>doUndo(1);
 $('again').onclick=()=>startMenu();
 
-function showOverlay(title,text,restart){
+// ぜんめんの がめん（はじめの メニュー／けっか）。buttons は [もじ, おしたとき, うすい いろか]
+function showOverlay(title,text,buttons){
   $('ovt').textContent=title;
-  $('ovp').innerHTML=text;
+  $('ovp').textContent=text;            // かいぎょうは \n（CSS の pre-line）
   const b=$('ovbtns'); b.innerHTML='';
-  const mk=(label,fn,sub)=>{const x=document.createElement('button');x.textContent=label;if(sub)x.className='sub';x.onclick=fn;b.appendChild(x);};
-  if(restart){
-    mk('もういちど',()=>{initGame();$('overlay').classList.add('hide');render();});
-    mk('📜 きろく・ランキング',()=>openHistory(),true);
-    mk('さいしょの がめんへ',()=>startMenu(),true);
-  }else{
-    mk('ひとりで あそぶ 🐤よわい',()=>chooseNames('cpu',2,3,'コンピュータ🐤よわい'));
-    mk('ひとりで あそぶ 🐔ふつう',()=>chooseNames('cpu',4,2,'コンピュータ🐔ふつう'));
-    mk('ひとりで あそぶ 🦁つよい',()=>chooseNames('cpu',6,1,'コンピュータ🦁つよい'));
-    mk('ふたりで あそぶ（2にん）',()=>chooseNames('two',0,1,null),true);
-    mk('📜 きろく・ランキング',()=>openHistory(),true);
-  }
+  buttons.forEach(([label,fn,sub])=>{
+    const x=document.createElement('button');
+    x.textContent=label; if(sub) x.className='sub'; x.onclick=fn;
+    b.appendChild(x);
+  });
   $('overlay').classList.remove('hide');
 }
 
-function begin(m,d,sloppy){
-  mode=m; CPU_DEPTH=d; CPU_SLOPPY=sloppy;
+function showResult(title,text){
+  showOverlay(title,text,[
+    ['もういちど',()=>begin(mode,cpuLevel)],
+    ['📜 きろく・ランキング',()=>openHistory(),true],
+    ['さいしょの がめんへ',()=>startMenu(),true],
+  ]);
+}
+
+// depth: なんて さきまで よむか。sloppy: うえから なんばんめ までの てから えらぶか（おおきいほど よわい）
+// label は きろくの あいての なまえ（コンピュータ＋label）にも なるので、かえると べつの あいて あつかいに なる
+const CPU_LEVELS=[
+  {label:'🐤よわい', depth:2, sloppy:3},
+  {label:'🐔ふつう', depth:4, sloppy:2},
+  {label:'🦁つよい', depth:6, sloppy:1},
+];
+
+function startMenu(){
+  gameId++;   // とちゅうの ゲームは ここで おわり。のこっている タイマーも うごかなく なる
+  showOverlay('どうぶつしょうぎ','あいての 🦁ライオンを とったら かち！\nじぶんの 🦁が いちばん おくに ついても かち！',[
+    ...CPU_LEVELS.map(lv=>['ひとりで あそぶ '+lv.label,()=>chooseNames('cpu',lv)]),
+    ['ふたりで あそぶ（2にん）',()=>chooseNames('two',null),true],
+    ['📜 きろく・ランキング',()=>openHistory(),true],
+  ]);
+}
+
+function begin(m,level){
+  mode=m; cpuLevel=level;
   initGame();
   $('overlay').classList.add('hide');
   render();
-}
-
-function startMenu(){
-  showOverlay('どうぶつしょうぎ','あいての 🦁ライオンを とったら かち！<br>じぶんの 🦁が いちばん おくに ついても かち！',false);
 }
 
 /* ===== ほぞん（localStorage が つかえなくても とまらないように） ===== */
@@ -747,7 +811,7 @@ function saveNames(obj){
   return lsSet(DS_NAMES, JSON.stringify(Object.assign(loadNames(),obj)));
 }
 
-function chooseNames(m,d,sloppy,cLabel){
+function chooseNames(m,level){
   const saved=loadNames();
   $('overlay').classList.add('hide');
   const fields=$('nameFields'); fields.innerHTML='';
@@ -762,27 +826,27 @@ function chooseNames(m,d,sloppy,cLabel){
   };
   if(m==='two'){
     $('nameTitle').textContent='なまえを いれてね';
-    mkField('inP0','🔵 したがわの ひと',saved.p0||'あお','o0');
-    mkField('inP1','🔴 うえがわの ひと',saved.p1||'あか','o1');
+    mkField('inP0','🔵 したがわの ひと',saved.p0||DEFAULT_NAMES.p0,'o0');
+    mkField('inP1','🔴 うえがわの ひと',saved.p1||DEFAULT_NAMES.p1,'o1');
   }else{
     $('nameTitle').textContent='きみの なまえは？';
-    mkField('inP0','なまえ',saved.solo||'きみ','o0');
+    mkField('inP0','なまえ',saved.solo||DEFAULT_NAMES.solo,'o0');
   }
   const btns=$('nameBtns'); btns.innerHTML='';
   const ok=document.createElement('button');
   ok.textContent='この なまえで はじめる';
   ok.onclick=()=>{
     if(m==='two'){
-      p0Name=($('inP0').value||'あお').trim()||'あお';
-      p1Name=($('inP1').value||'あか').trim()||'あか';
+      p0Name=$('inP0').value.trim()||DEFAULT_NAMES.p0;
+      p1Name=$('inP1').value.trim()||DEFAULT_NAMES.p1;
       saveNames({p0:p0Name,p1:p1Name});
     }else{
-      p0Name=($('inP0').value||'きみ').trim()||'きみ';
-      p1Name=cLabel;
+      p0Name=$('inP0').value.trim()||DEFAULT_NAMES.solo;
+      p1Name='コンピュータ'+level.label;
       saveNames({solo:p0Name});
     }
     $('nameOverlay').classList.remove('active');
-    begin(m,d,sloppy);
+    begin(m,level);
   };
   const back=document.createElement('button');
   back.className='sub'; back.textContent='もどる';
@@ -793,7 +857,8 @@ function chooseNames(m,d,sloppy,cLabel){
 
 /* ===== きろく・ランキング ===== */
 const DS_HISTORY="doubutsuShogi_history_v1";
-const HISTORY_MAX=40;
+// ランキングも この きろくから けいさんする。すくないと ふるい たいせんが きえて じゅんいが かわってしまう
+const HISTORY_MAX=1000;
 const WIN_TYPES=['capture','try','stuck','repeat'];
 
 // よみこむ ときに かならず とおす。かけた／こわれた／さいくされた データを ここで あんぜんに する。
@@ -829,29 +894,28 @@ function saveHistory(entry){
   return lsSet(DS_HISTORY, JSON.stringify(h));
 }
 
-// ひょうじ用の 1ぎょうを つくる。ここで total/rate/rateText を そろえるので
+// ひょうじ用の 1ぎょうを つくる。ここで rate/rateText を そろえるので
 // つかう がわ（renderRankTable）で こうもくが かけることが なくなる。
 function statRow(s){
   const decided=s.win+s.lose;          // かちりつの ぶんぼは ひきわけを のぞく
   return {
     name:s.name, win:s.win, lose:s.lose, draw:s.draw,
-    total:decided+s.draw,
     rate: decided>0 ? s.win/decided : 0,
     rateText: decided>0 ? Math.round(s.win/decided*100)+'%' : '-'
   };
 }
+function statOf(stats,name){
+  return stats[name] || (stats[name]={name:name,win:0,lose:0,draw:0});
+}
 
 function computeRanking(history){
   const stats={};
-  history.filter(h=>h.mode==='two').forEach(h=>{
-    [h.p0,h.p1].forEach(n=>{ if(!stats[n]) stats[n]={name:n,win:0,lose:0,draw:0}; });
-    if(h.winner===0||h.winner===1){
-      stats[h.winner===0?h.p0:h.p1].win++;
-      stats[h.winner===0?h.p1:h.p0].lose++;
-    }else{
-      stats[h.p0].draw++;
-      if(h.p1!==h.p0) stats[h.p1].draw++;
-    }
+  // おなじ なまえ どうしの たいせんは、1人に かちと まけが りょうほう ついて しまうので かぞえない
+  history.filter(h=>h.mode==='two' && h.p0!==h.p1).forEach(h=>{
+    const a=statOf(stats,h.p0), b=statOf(stats,h.p1);
+    if(h.winner===0)      { a.win++; b.lose++; }
+    else if(h.winner===1) { b.win++; a.lose++; }
+    else                  { a.draw++; b.draw++; }
   });
   return Object.values(stats).map(statRow).sort((a,b)=> b.win-a.win || b.rate-a.rate);
 }
@@ -860,11 +924,10 @@ function computeRanking(history){
 function computeCpuStats(history){
   const stats={};
   history.filter(h=>h.mode==='cpu').forEach(h=>{
-    const key=h.p1;
-    if(!stats[key]) stats[key]={name:key,win:0,lose:0,draw:0};
-    if(h.winner===0)      stats[key].win++;
-    else if(h.winner===1) stats[key].lose++;
-    else                  stats[key].draw++;
+    const s=statOf(stats,h.p1);
+    if(h.winner===0)      s.win++;
+    else if(h.winner===1) s.lose++;
+    else                  s.draw++;
   });
   return Object.values(stats).map(statRow).sort((a,b)=> (b.win-b.lose)-(a.win-a.lose));
 }
@@ -881,10 +944,12 @@ function renderRankTable(rows,elId,emptyMsg){
   box.innerHTML=html;
 }
 
+function pad2(n){ return String(n).padStart(2,'0'); }
+
 function fmtDate(iso){
   const d=new Date(iso);
   if(isNaN(d.getTime())) return '';
-  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  return `${d.getMonth()+1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
 function resultLabel(h){
@@ -922,6 +987,7 @@ function openHistory(){
   renderHistoryList(history);
   $('historyOverlay').classList.add('active');
 }
+$('backupNote').textContent=`きろくは この たんまつだけに ほぞんされています（あたらしい ほうから ${HISTORY_MAX}かいぶん）。きえるのが しんぱいな ときは 書き出しておくと あんしんです`;
 $('historyCloseBtn').onclick=()=>{ $('historyOverlay').classList.remove('active'); };
 $('history').onclick=()=>openHistory();
 $('clearHistoryBtn').onclick=()=>{
@@ -933,51 +999,87 @@ $('clearHistoryBtn').onclick=()=>{
 };
 
 /* ===== バックアップ（書き出し／読み込み） ===== */
-function pad2(n){ return String(n).padStart(2,'0'); }
+const BACKUP_VERSION=1;
+
+// ホームがめんに ついかした アプリとして ひらいているか
+function isStandalone(){
+  return navigator.standalone===true ||
+    (!!window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+}
 
 $('exportBtn').onclick=()=>{
+  const check=$('backupCheck');
   const data={
-    app:'doubutsuShogi', version:1, exportedAt:new Date().toISOString(),
+    app:'doubutsuShogi', version:BACKUP_VERSION, exportedAt:new Date().toISOString(),
     names: loadNames(), history: loadHistory()
   };
-  const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
-  const url=URL.createObjectURL(blob);
+  const json=JSON.stringify(data);
   const d=new Date();
   const fname=`どうぶつしょうぎ_バックアップ_${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}.json`;
+
+  // ホームがめんの アプリ（とくに iPhone）は ダウンロードリンクで ほぞん できない ことが あるので、
+  // つかえる ときは きょうゆうシートから「ファイルに ほぞん」してもらう
+  if(isStandalone() && navigator.canShare){
+    const file=new File([json],fname,{type:'application/json'});
+    if(navigator.canShare({files:[file]})){
+      navigator.share({files:[file]})
+        .then(()=>{ check.textContent='✅ '+fname+' を 書き出しました'; })
+        .catch(err=>{
+          check.textContent = (err && err.name==='AbortError')
+            ? '書き出しを やめました' : '⚠️ 書き出せませんでした';
+        });
+      return;
+    }
+  }
+
+  const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));
   const a=document.createElement('a');
   a.href=url; a.download=fname;
   document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),2000);
-  $('backupCheck').textContent='✅ '+fname+' を 書き出しました';
+  // すぐ むこうに すると ほぞんの とちゅうで しっぱい することが あるので ながめに まつ
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+  // ダウンロードは ほんとうに ほぞん できたかを しる ほうほうが ないので「できた」とは いいきらない
+  check.textContent='📤 '+fname+' を 書き出しています。ダウンロード（ファイル）に あるか たしかめてね';
 };
 
 $('importInput').addEventListener('change',(e)=>{
   const file=e.target.files[0];
   e.target.value='';
   if(!file) return;
+  const check=$('backupCheck');
   const reader=new FileReader();
   reader.onload=()=>{
     let data;
     try{ data=JSON.parse(reader.result); }
-    catch(err){ $('backupCheck').textContent='⚠️ この ファイルは よみこめませんでした'; return; }
+    catch(err){ check.textContent='⚠️ この ファイルは よみこめませんでした'; return; }
     if(!data || data.app!=='doubutsuShogi' || !Array.isArray(data.history)){
-      $('backupCheck').textContent='⚠️ どうぶつしょうぎの バックアップ ファイルでは ないようです';
+      check.textContent='⚠️ どうぶつしょうぎの バックアップ ファイルでは ないようです';
       return;
     }
-    if(!confirm('いまの きろく・なまえを、よみこんだ データで じょうがきします。よろしいですか？')) return;
+    if(typeof data.version==='number' && data.version>BACKUP_VERSION){
+      check.textContent='⚠️ あたらしい バージョンで つくられた ファイルなので よみこめません';
+      return;
+    }
     const parsed=data.history.map(sanitizeEntry).filter(Boolean);
-    const cleaned=parsed.slice(0,HISTORY_MAX);
-    if(!lsSet(DS_HISTORY, JSON.stringify(cleaned))){
-      $('backupCheck').textContent='⚠️ この たんまつに ほぞんできませんでした';
+    // 1けんも よみとれない ファイルで いまの きろくを けして しまわないように、じょうがきの まえに とめる
+    if(data.history.length>0 && parsed.length===0){
+      check.textContent='⚠️ よみとれる きろくが ありませんでした（いまの きろくは そのままです）';
       return;
     }
-    lsSet(DS_NAMES, JSON.stringify(sanitizeNames(data.names)));
+    const cleaned=parsed.slice(0,HISTORY_MAX);
+    if(!confirm(`いまの きろく・なまえを、よみこんだ データ（${cleaned.length}けん）で じょうがきします。よろしいですか？`)) return;
+    if(!lsSet(DS_HISTORY, JSON.stringify(cleaned))){
+      check.textContent='⚠️ この たんまつに ほぞんできませんでした';
+      return;
+    }
+    const namesSaved=lsSet(DS_NAMES, JSON.stringify(sanitizeNames(data.names)));
     const skipped=data.history.length-parsed.length;
-    $('backupCheck').textContent='✅ '+cleaned.length+'けん よみこみました'
-      +(skipped>0?'（よみとれない '+skipped+'けんは とばしました）':'');
+    check.textContent='✅ '+cleaned.length+'けん よみこみました'
+      +(skipped>0?'（よみとれない '+skipped+'けんは とばしました）':'')
+      +(namesSaved?'':'（なまえは ほぞんできませんでした）');
     openHistory();
   };
-  reader.onerror=()=>{ $('backupCheck').textContent='⚠️ ファイルを よみこめませんでした'; };
+  reader.onerror=()=>{ check.textContent='⚠️ ファイルを よみこめませんでした'; };
   reader.readAsText(file);
 });
 
@@ -989,15 +1091,27 @@ function openReplay(h){
     ? `${h.winner===0?h.p0:h.p1} の かち（${resultLabel(h)}・${h.moves}て）`
     : `${resultLabel(h)}（${h.moves}て）`;
   const rb=$('replayBoard'); rb.innerHTML='';
-  for(let i=0;i<12;i++){
-    const d=document.createElement('div'); d.className='cell';
-    const p=h.finalBoard[i];
-    if(p) d.innerHTML=pieceHTML(p);
-    rb.appendChild(d);
-  }
+  for(let i=0;i<12;i++) rb.appendChild(makeCell(i,h.finalBoard[i]));
+  fillHand($('replayHand1'),h.finalHands[1],1);
+  fillHand($('replayHand0'),h.finalHands[0],0);
   $('replayOverlay').classList.add('active');
 }
 $('replayCloseBtn').onclick=()=>{ $('replayOverlay').classList.remove('active'); };
+
+/* ===== ばんの おおきさ ===== */
+// もちごまを のぞいた のこりの たかさに ばんを おさめる。こうしないと ちいさい がめん
+// （とくに 2にんで あそぶ とき）で したの ボタンが がめんの そとに でて おせなくなる。
+const boardWrap=$('boardWrap');
+const BOARD_MIN_W=150;
+function fitBoard(){
+  let others=0;
+  for(const c of boardWrap.children) if(c!==boardEl) others+=c.offsetHeight;
+  const w=Math.floor((boardWrap.clientHeight-others)*3/4);
+  boardEl.style.width=Math.max(BOARD_MIN_W,w)+'px';   // うえの げんかいは CSS の max-width
+}
+if('ResizeObserver' in window) new ResizeObserver(fitBoard).observe(boardWrap);
+else window.addEventListener('resize',fitBoard);
+fitBoard();
 
 startMenu();
 
