@@ -103,11 +103,14 @@ button:disabled{opacity:.4;}
 
 #overlay{
   position:fixed;inset:0;background:#fdf6e3;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:10;
+  display:flex;flex-direction:column;align-items:center;gap:14px;z-index:10;
   padding:24px 16px;text-align:center;overflow-y:auto;
 }
-#ovbtns{display:flex;flex-direction:column;gap:10px;width:100%;max-width:330px;padding-bottom:20px;}
-#ovbtns button{font-size:18px;padding:14px 16px;}
+/* たての まんなかよせは auto の よはくで する（justify-content:center だと、はみでた ときに うえが きれて スクロールしても みえない） */
+#overlay>:first-child{margin-top:auto;}
+#ovbtns{display:flex;flex-direction:column;gap:10px;width:100%;max-width:330px;padding-bottom:20px;margin-bottom:auto;}
+#ovbtns button,#ovresume{font-size:18px;padding:14px 16px;}
+#ovresume{width:100%;max-width:330px;}
 #overlay.hide{display:none;}
 #overlay h2{font-size:26px;margin:0;}
 #overlay p{font-size:16px;margin:0;line-height:1.7;white-space:pre-line;}
@@ -209,6 +212,7 @@ h3.sec-title{font-size:14px;margin:4px 0 8px;text-align:left;opacity:.75;}
 <div id="overlay">
   <h2 id="ovt">どうぶつしょうぎ</h2>
   <p id="ovp"></p>
+  <button id="ovresume" hidden>▶ つづきから あそぶ</button>
   <div id="rules">
     <b>🦁ライオン</b>ぜんぶの ほうこうに 1ます<br>
     <b>🦒きりん</b>たて・よこに 1ます<br>
@@ -738,6 +742,7 @@ $('again').onclick=()=>startMenu();
 
 // ぜんめんの がめん（はじめの メニュー／けっか）。buttons は [もじ, おしたとき, うすい いろか]
 function showOverlay(title,text,buttons){
+  $('ovresume').hidden=true;            // 「つづき」は startMenu だけが だす
   $('ovt').textContent=title;
   $('ovp').textContent=text;            // かいぎょうは \n（CSS の pre-line）
   const b=$('ovbtns'); b.innerHTML='';
@@ -765,14 +770,30 @@ const CPU_LEVELS=[
   {label:'🦁つよい', depth:6, sloppy:1},
 ];
 
+// とちゅうの ゲームが あるか（1てでも さしていて、まだ おわっていない）
+function hasGameInProgress(){
+  return !!hist && hist.length>0 && !over;
+}
+
 function startMenu(){
-  gameId++;   // とちゅうの ゲームは ここで おわり。のこっている タイマーも うごかなく なる
+  gameId++;   // のこっている タイマー（コンピュータの て・けっか がめん）は ここで うごかなく なる
   showOverlay('どうぶつしょうぎ','あいての 🦁ライオンを とったら かち！\nじぶんの 🦁が いちばん おくに ついても かち！',[
     ...CPU_LEVELS.map(lv=>['ひとりで あそぶ '+lv.label,()=>chooseNames('cpu',lv)]),
     ['ふたりで あそぶ（2にん）',()=>chooseNames('two',null),true],
     ['📜 きろく・ランキング',()=>openHistory(),true],
   ]);
+  // まちがえて「さいしょから」を おしても もどれるように、とちゅうの ゲームが あれば ルールより うえに だす
+  $('ovresume').hidden=!hasGameInProgress();
 }
+
+// メニューから とちゅうの ゲームに もどる
+function resumeGame(){
+  busy=false;          // かんがえちゅうに メニューを ひらいた ときの タイマーは startMenu で とまっている
+  $('overlay').classList.add('hide');
+  render();
+  if(mode==='cpu' && turn===1) cpuMove();   // コンピュータの ばんなら かんがえなおす
+}
+$('ovresume').onclick=()=>resumeGame();
 
 function begin(m,level){
   mode=m; cpuLevel=level;
