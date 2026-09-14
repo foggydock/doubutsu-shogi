@@ -12,7 +12,10 @@
  *    （つぎに ひらいた ときに あたらしく なる）。
  */
 const VERSION = 'v3';
-const CACHE   = 'doubutsu-shogi-' + VERSION;
+// おなじ ドメイン（foggydock.github.io）の ほかの アプリと キャッシュの おきばが きょうつう なので、
+// けすのは この なまえで はじまる ふるい キャッシュだけに する
+const CACHE_PREFIX = 'doubutsu-shogi-';
+const CACHE   = CACHE_PREFIX + VERSION;
 const NET_TIMEOUT_MS = 3000;
 
 // スコープ（/doubutsu-shogi/ など）を きじゅんに した ぜったいURL
@@ -33,7 +36,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith(CACHE_PREFIX) && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
