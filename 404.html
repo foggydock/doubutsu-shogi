@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>どうぶつしょうぎは引っ越しました</title>
+<style>
+  body{margin:0;padding:32px 20px;background:#f7f7f5;color:#222;line-height:1.7;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif}
+  main{max-width:520px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 12px}
+  .btn{display:block;width:100%;box-sizing:border-box;text-align:center;font-size:16px;padding:14px;border-radius:12px;border:none;margin:10px 0;text-decoration:none;cursor:pointer;font-family:inherit}
+  a.btn{background:#2563eb;color:#fff}
+  button.btn{background:#e5e7eb;color:#111}
+  textarea{width:100%;box-sizing:border-box;height:140px;font-size:12px}
+  .small{font-size:13px;color:#555}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <h1>どうぶつしょうぎは新しいURLに引っ越しました</h1>
+  <p>新しいURL：<a href="https://doubutsu-shogi.pages.dev/">https://doubutsu-shogi.pages.dev/</a></p>
+  <p id="auto" class="small">自動で移動します…</p>
+  <section id="leftover" hidden>
+    <p id="leftover-msg"></p>
+    <button id="copy" class="btn" type="button">コピーする</button>
+    <p id="copied" class="small" hidden>コピーしました。新しいURLを開いて貼り付けてください。</p>
+    <p id="copy-fallback" class="small" hidden>自動でコピーできなかったので、下の欄を全部選んでコピーしてください。</p>
+    <textarea id="data" readonly hidden></textarea>
+    <a id="open" class="btn" href="https://doubutsu-shogi.pages.dev/">新しいURLで開く</a>
+  </section>
+  <p class="small">ホーム画面に追加している場合は、新しいURLで追加し直してください。</p>
+</main>
+<script>
+const CONFIG = {"repo":"doubutsu-shogi","to":"https://doubutsu-shogi.pages.dev/","removeKeys":[],"removePrefixes":[],"cachePrefix":"doubutsu-shogi-","leftover":"shogi"};
+
+function readJSON(k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+function count(x) { return Array.isArray(x) ? x.length : (x && typeof x === 'object' ? Object.keys(x).length : 0); }
+
+// この端末の中にしか無いデータ（引き継がないと失われるもの）
+//   mode 'copy'：文字としてコピーして貼り付けてもらう
+//   mode 'file'：アプリの書き出しと同じ形のファイルに保存して、新しいURLで読み込んでもらう
+async function leftoverFor(kind) {
+  try {
+    if (kind === 'aws') {
+      var questions = readJSON('awsq_questions_v1') || [], terms = readJSON('awsq_terms_v1') || [];
+      var progress = readJSON('awsq_progress_v1') || {}, studyLog = readJSON('awsq_studylog_v1') || {};
+      if (!count(questions) && !count(terms) && !count(progress) && !count(studyLog)) return null;
+      return {
+        mode: 'copy',
+        text: JSON.stringify({ questions: questions, terms: terms, progress: progress, studyLog: studyLog, exportedAt: new Date().toISOString() }),
+        msg: 'この端末に学習データ（問題・用語・学習記録・学習時間）が残っています。「コピーする」を押してから新しいURLを開き、設定の「問題データの読み込み」の欄に貼り付けて「貼り付けたJSONを読み込む」を押すと引き継げます。'
+      };
+    }
+    if (kind === 'draft') {
+      var d = localStorage.getItem('raw_draft');
+      if (!d) return null;
+      return { mode: 'copy', text: d, msg: 'この端末に書きかけの下書きが残っています。「コピーする」を押してから新しいURLを開き、入力欄に貼り付けてください。' };
+    }
+    if (kind === 'music') {
+      var items = readJSON('musiclog.items.v1');
+      if (!Array.isArray(items) || !items.length) return null;
+      return {
+        mode: 'file',
+        text: JSON.stringify(items, null, 2),
+        filename: 'musiclog-backup-' + new Date().toISOString().slice(0, 10) + '.json',
+        msg: 'この端末に曲のリスト（' + items.length + '曲）が残っています。「ファイルに書き出す」で保存してから新しいURLを開き、設定（⚙）の「読み込み」でそのファイルを選ぶと引き継げます。'
+      };
+    }
+    if (kind === 'othello') {
+      var settings = readJSON('familyOthello_settings_v1');
+      var history = readJSON('familyOthello_history_v1') || [];
+      var photos = [];
+      try {
+        var db = await new Promise(function (resolve, reject) {
+          var req = indexedDB.open('familyOthelloDB', 1);
+          req.onupgradeneeded = function () { req.result.createObjectStore('photos', { keyPath: 'id' }); };
+          req.onsuccess = function () { resolve(req.result); };
+          req.onerror = function () { reject(req.error); };
+        });
+        photos = await new Promise(function (resolve, reject) {
+          var tx = db.transaction('photos', 'readonly');
+          var req = tx.objectStore('photos').getAll();
+          req.onsuccess = function () { resolve(req.result || []); };
+          req.onerror = function () { reject(req.error); };
+        });
+      } catch (e) {}
+      if (!photos.length && !history.length) return null;
+      return {
+        mode: 'file',
+        text: JSON.stringify({ app: 'familyOthello', version: 1, exportedAt: new Date().toISOString(), photos: photos, settings: settings, history: history }),
+        filename: 'マイオセロ_バックアップ_' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '.json',
+        msg: 'この端末に写真（' + photos.length + '枚）・対戦記録（' + history.length + '件）が残っています。「ファイルに書き出す」で保存してから新しいURLを開き、設定の「読み込み」でそのファイルを選ぶと引き継げます。'
+      };
+    }
+    if (kind === 'satto') {
+      var state = readJSON('sat_task_v1');
+      var tasks = state && Array.isArray(state.tasks) ? state.tasks : [];
+      if (!tasks.length) return null;
+      return {
+        mode: 'file',
+        text: JSON.stringify(state, null, 2),
+        filename: 'satto-task-backup-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '.json',
+        msg: 'この端末にタスク（' + tasks.length + '件）が残っています。「ファイルに書き出す」で保存してから新しいURLを開き、⚙️メニューの「読み込み」でそのファイルを選ぶと引き継げます。'
+      };
+    }
+    if (kind === 'routine') {
+      var routines = readJSON('routine-app-v1') || [];
+      if (!Array.isArray(routines) || !routines.length) return null;
+      return {
+        mode: 'file',
+        text: JSON.stringify({ app: 'my-routine', version: 1, exportedAt: new Date().toISOString(), routines: routines }, null, 2),
+        filename: 'routine-backup-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '.json',
+        msg: 'この端末にルーティン（' + routines.length + '件）が残っています。「ファイルに書き出す」で保存してから新しいURLを開き、「読み込み」でそのファイルを選ぶと引き継げます（新しいURL側にすでにデータがあれば置き換わります）。'
+      };
+    }
+    if (kind === 'shogi') {
+      var names = readJSON('doubutsuShogi_names_v1');
+      var history = readJSON('doubutsuShogi_history_v1') || [];
+      if (!history.length) return null;
+      return {
+        mode: 'file',
+        text: JSON.stringify({ app: 'doubutsuShogi', version: 1, exportedAt: new Date().toISOString(), names: names, history: history }),
+        filename: 'どうぶつしょうぎ_バックアップ_' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '.json',
+        msg: 'この端末に対戦記録（' + history.length + '件）が残っています。「ファイルに書き出す」で保存してから新しいURLを開き、「きろく・ランキング」の「読み込み」でそのファイルを選ぶと引き継げます。'
+      };
+    }
+  } catch (e) {}
+  return null;
+}
+
+// アプリの書き出しと同じく、共有シートが使えればそちらで、使えなければダウンロードで保存する
+async function saveFile(left) {
+  var blob = new Blob([left.text], { type: 'application/json' });
+  try {
+    var file = new File([blob], left.filename, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: left.filename });
+      return 'shared';
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return 'cancel';
+  }
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = left.filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 60000);
+  return 'downloaded';
+}
+
+(async function () {
+  var BASE = location.origin + '/' + CONFIG.repo + '/';
+
+  // 1) 引っ越し後は使わない、ログイン状態や API キーをこの端末から消す
+  try {
+    Object.keys(localStorage).forEach(function (k) {
+      var hit = CONFIG.removeKeys.indexOf(k) >= 0 || CONFIG.removePrefixes.some(function (p) { return k.indexOf(p) === 0; });
+      if (hit) localStorage.removeItem(k);
+    });
+  } catch (e) {}
+
+  // 2) 前の版のオフライン機能とキャッシュを片付ける（このアプリの分だけ）
+  var cleanup = (async function () {
+    try {
+      if ('serviceWorker' in navigator) {
+        var regs = await navigator.serviceWorker.getRegistrations();
+        for (var i = 0; i < regs.length; i++) if (regs[i].scope === BASE) await regs[i].unregister();
+      }
+      if (CONFIG.cachePrefix && 'caches' in window) {
+        var keys = await caches.keys();
+        for (var j = 0; j < keys.length; j++) if (keys[j].indexOf(CONFIG.cachePrefix) === 0) await caches.delete(keys[j]);
+      }
+    } catch (e) {}
+  })();
+  await Promise.race([cleanup, new Promise(function (r) { setTimeout(r, 1500); })]);
+
+  var dest = CONFIG.to + location.search + location.hash;
+  var ackKey = 'moved_ack_' + CONFIG.repo;
+  var acked = false;
+  try { acked = localStorage.getItem(ackKey) === '1'; } catch (e) {}
+  var left = (!acked && CONFIG.leftover) ? await leftoverFor(CONFIG.leftover) : null;
+
+  // 3) 引き継ぐデータが無ければそのまま新しいURLへ
+  if (!left) { location.replace(dest); return; }
+
+  // 4) あれば自動では移動せず、保存してから開いてもらう
+  var copyBtn = document.getElementById('copy'), note = document.getElementById('copied');
+  document.getElementById('auto').hidden = true;
+  document.getElementById('leftover-msg').textContent = left.msg;
+  document.getElementById('leftover').hidden = false;
+  copyBtn.textContent = left.mode === 'file' ? 'ファイルに書き出す' : 'コピーする';
+  copyBtn.onclick = async function () {
+    if (left.mode === 'file') {
+      var how = await saveFile(left);
+      if (how === 'cancel') return;
+      note.textContent = how === 'shared'
+        ? '保存しました。新しいURLを開いて、設定の「読み込み」でファイルを選んでください。'
+        : '書き出しました（ダウンロードに保存されます）。新しいURLを開いて、設定の「読み込み」でファイルを選んでください。';
+      note.hidden = false;
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(left.text);
+      note.hidden = false;
+    } catch (e) {
+      var ta = document.getElementById('data');
+      ta.value = left.text; ta.hidden = false;
+      document.getElementById('copy-fallback').hidden = false;
+      ta.focus(); ta.select();
+    }
+  };
+  document.getElementById('open').onclick = function () {
+    try { localStorage.setItem(ackKey, '1'); } catch (e) {}   // 次からは自動で移動する
+    location.href = dest;
+    return false;
+  };
+})();
+
+</script>
+</body>
+</html>
