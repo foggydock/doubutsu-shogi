@@ -395,7 +395,9 @@ function apply(state,m){
     const cap=state.bd[m.to];
     if(cap){
       undo.cap=cap;
-      state.hands[state.turn].push(cap.t==='H'?'C':cap.t);
+      // 🦁を とった ときは そのまま かちが きまるので もちごまには しない
+      // （もちごまに いれると、かち画面や きろくに ライオンが のこって しまう）
+      if(cap.t!=='L') state.hands[state.turn].push(cap.t==='H'?'C':cap.t);
     }
     state.bd[m.to]=p; state.bd[m.from]=null;
     const backRow = p.o===0?0:3;
@@ -416,7 +418,7 @@ function unapply(state,u){
     if(u.promo) p.t='C';
     state.bd[m.from]=p;
     state.bd[m.to]=u.cap;
-    if(u.cap){
+    if(u.cap && u.cap.t!=='L'){
       const t=u.cap.t==='H'?'C':u.cap.t;
       const hi=state.hands[state.turn].lastIndexOf(t);
       state.hands[state.turn].splice(hi,1);
