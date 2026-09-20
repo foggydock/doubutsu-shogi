@@ -420,7 +420,10 @@ function canDrop(state,o,t,to){
   // ひよこは進めない最奥段には置けず、同じたて列に2まい置けない（二歩）
   if(r===(o===0?0:spec().rows-1)) return false;
   const c=colOf(to);
-  return !state.bd.some((p,i)=>p && p.o===o && p.t==='C' && colOf(i)===c);
+  if(state.bd.some((p,i)=>p && p.o===o && p.t==='C' && colOf(i)===c)) return false;
+  // ごろごろ版では、もちごまのひよこを相手ライオンのまえに打つ手もできない。
+  const lion=lionAt(state,1-o);
+  return lion!==to+(o===0?-spec().cols:spec().cols);
 }
 
 function apply(state,m){
