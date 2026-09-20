@@ -67,6 +67,7 @@ h1{font-size:22px;margin:6px 0 2px;letter-spacing:2px;}
 }
 .cell .pc.o0{border-color:var(--me);}
 .cell .pc.o1{border-color:var(--you);transform:rotate(180deg);}
+.cell .pc .power{position:absolute;font-size:12px;right:-2px;top:-5px;color:#f0a04b;transform:rotate(0deg);}
 .cell.sel .pc{background:var(--sel);}
 .cell.hi::after{
   content:"";position:absolute;width:34%;height:34%;border-radius:50%;
@@ -277,10 +278,10 @@ h3.sec-title{font-size:14px;margin:4px 0 8px;text-align:left;opacity:.75;}
 <script>
 "use strict";
 /* ===== ばんめん ===== */
-// index = r*3+c   r=0 が うえ(あいて)、r=3 が した(じぶん)
-// piece = {t:'L'|'G'|'E'|'C'|'H', o:0|1}   o=0 が した(せんて/じぶん)
-const EMOJI={L:'🦁',G:'🦒',E:'🐘',C:'🐤',H:'🐔'};
-const VAL  ={L:1000,G:60,E:55,C:25,H:70};
+// index = r*COLS+c   r=0 が うえ(あいて)、さいしゅうだんが した(じぶん)
+// o=0 が した(せんて/じぶん)。N=ねこ、D=いぬ、Q=パワーアップねこ
+const EMOJI={L:'🦁',G:'🦒',E:'🐘',C:'🐤',H:'🐔',N:'🐱',D:'🐶',Q:'🐱'};
+const VAL  ={L:1000,G:60,E:55,C:25,H:70,N:45,D:70,Q:70};
 
 // うごきかた（o=0 めせん。まえ = row -1）
 const MOVES={
@@ -288,25 +289,45 @@ const MOVES={
   G:[[-1,0],[1,0],[0,-1],[0,1]],
   E:[[-1,-1],[-1,1],[1,-1],[1,1]],
   C:[[-1,0]],
-  H:[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]]
+  H:[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]],
+  D:[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]],
+  Q:[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]],
+  N:[[-1,-1],[-1,0],[-1,1],[1,-1],[1,1]]
 };
 
 let bd, hands, turn, hist, mode, over, sel, lastMove, busy, moveCount, hintMove, hintsLeft;
 let cpuLevel=null;
+let variant='mini';
 // ゲームが かわるたびに ふやす。まえの ゲームの タイマーが あとから うごかないように する（gameTimeout）
 let gameId=0;
 const DEFAULT_NAMES={p0:'あお', p1:'あか', solo:'きみ'};
 let p0Name=DEFAULT_NAMES.p0, p1Name=DEFAULT_NAMES.p1;
 const HINT_MAX=3, REPEAT_MAX=3;
 
+const VARIANTS={
+  mini:{label:'どうぶつしょうぎ（3×4）',cols:3,rows:4},
+  goro:{label:'ごろごろどうぶつしょうぎ（5×6）',cols:5,rows:6}
+};
+function spec(){ return VARIANTS[variant]; }
+function boardSize(){ return spec().cols*spec().rows; }
+function rowOf(i){ return (i/spec().cols|0); }
+function colOf(i){ return i%spec().cols; }
+
 function initGame(){
   gameId++;
-  bd=new Array(12).fill(null);
+  bd=new Array(boardSize()).fill(null);
   const put=(i,t,o)=>bd[i]={t:t,o:o};
-  put(0,'G',1); put(1,'L',1); put(2,'E',1);
-  put(4,'C',1);
-  put(7,'C',0);
-  put(9,'E',0); put(10,'L',0); put(11,'G',0);
+  if(variant==='mini'){
+    put(0,'G',1); put(1,'L',1); put(2,'E',1);
+    put(4,'C',1);
+    put(7,'C',0);
+    put(9,'E',0); put(10,'L',0); put(11,'G',0);
+  }else{
+    // ごろごろどうぶつしょうぎ：ねこ・いぬ・ライオン・いぬ・ねこ／ひよこ3まい
+    ['N','D','L','D','N'].forEach((t,i)=>{ put(i,t,1); put(25+i,t,0); });
+    [11,12,13].forEach(i=>put(i,'C',1));
+    [16,17,18].forEach(i=>put(i,'C',0));
+  }
   hands=[[],[]];
   turn=0; over=null; sel=null; lastMove=null; hist=[]; busy=false; moveCount=0; hintMove=null;
   hintsLeft=[HINT_MAX,HINT_MAX];
@@ -339,26 +360,26 @@ function repeatCount(){
 }
 
 /* ===== ルール ===== */
-function inB(r,c){return r>=0&&r<4&&c>=0&&c<3;}
+function inB(r,c){return r>=0&&r<spec().rows&&c>=0&&c<spec().cols;}
 
 function movesFrom(state,i){
   const p=state.bd[i]; if(!p) return [];
-  const r=(i/3|0), c=i%3, out=[];
+  const r=rowOf(i), c=colOf(i), out=[];
   for(const d of MOVES[p.t]){
     const dr = p.o===0 ? d[0] : -d[0];
     const dc = p.o===0 ? d[1] : -d[1];
     const nr=r+dr, nc=c+dc;
     if(!inB(nr,nc)) continue;
-    const t=state.bd[nr*3+nc];
+    const t=state.bd[nr*spec().cols+nc];
     if(t && t.o===p.o) continue;
-    out.push(nr*3+nc);
+    out.push(nr*spec().cols+nc);
   }
   return out;
 }
 
 // その ますが あいて(by)に せめられて いるか
 function attacked(state,idx,by){
-  for(let i=0;i<12;i++){
+  for(let i=0;i<state.bd.length;i++){
     const p=state.bd[i];
     if(!p||p.o!==by) continue;
     if(movesFrom(state,i).includes(idx)) return true;
@@ -368,7 +389,7 @@ function attacked(state,idx,by){
 
 function genMoves(state,o){
   const list=[];
-  for(let i=0;i<12;i++){
+  for(let i=0;i<state.bd.length;i++){
     const p=state.bd[i];
     if(!p||p.o!==o) continue;
     for(const to of movesFrom(state,i)) list.push({from:i,to:to});
@@ -377,9 +398,29 @@ function genMoves(state,o){
   const seen={};
   state.hands[o].forEach(t=>{
     if(seen[t]) return; seen[t]=1;
-    for(let i=0;i<12;i++) if(!state.bd[i]) list.push({drop:t,to:i});
+    for(let i=0;i<state.bd.length;i++) if(!state.bd[i] && canDrop(state,o,t,i)) list.push({drop:t,to:i});
   });
-  return list;
+  // ごろごろ版は、ライオンが取られる場所へ動かす手はさせない
+  if(variant!=='goro') return list;
+  return list.filter(m=>isLegalMove(state,o,m));
+}
+
+function isLegalMove(state,o,m){
+  if(variant!=='goro') return true;
+  const u=apply(state,m);
+  const li=lionAt(state,o);
+  const safe=li>=0 && !attacked(state,li,1-o);
+  unapply(state,u);
+  return safe;
+}
+
+function canDrop(state,o,t,to){
+  if(variant!=='goro' || t!=='C') return true;
+  const r=rowOf(to);
+  // ひよこは進めない最奥段には置けず、同じたて列に2まい置けない（二歩）
+  if(r===(o===0?0:spec().rows-1)) return false;
+  const c=colOf(to);
+  return !state.bd.some((p,i)=>p && p.o===o && p.t==='C' && colOf(i)===c);
 }
 
 function apply(state,m){
@@ -394,11 +435,13 @@ function apply(state,m){
     const cap=state.bd[m.to];
     if(cap){
       undo.cap=cap;
-      state.hands[state.turn].push(cap.t==='H'?'C':cap.t);
+      // ライオンを取ったらそこで対局終了。もちごまにはならない。
+      if(cap.t!=='L') state.hands[state.turn].push(basePiece(cap.t));
     }
     state.bd[m.to]=p; state.bd[m.from]=null;
-    const backRow = p.o===0?0:3;
-    if(p.t==='C' && (m.to/3|0)===backRow){ p.t='H'; undo.promo=true; }
+    const backRow = p.o===0?0:spec().rows-1;
+    if(p.t==='C' && (variant==='mini' ? rowOf(m.to)===backRow : inPromotionZone(m.to,p.o))){ p.t='H'; undo.promo=true; }
+    if(variant==='goro' && p.t==='N' && inPromotionZone(m.to,p.o)){ p.t='Q'; undo.promo=true; }
   }
   state.turn=1-state.turn;
   return undo;
@@ -412,19 +455,27 @@ function unapply(state,u){
     state.hands[state.turn].splice(u.hidx,0,m.drop);
   }else{
     const p=state.bd[m.to];
-    if(u.promo) p.t='C';
+    if(u.promo) p.t=(p.t==='Q'?'N':'C');
     state.bd[m.from]=p;
     state.bd[m.to]=u.cap;
     if(u.cap){
-      const t=u.cap.t==='H'?'C':u.cap.t;
-      const hi=state.hands[state.turn].lastIndexOf(t);
-      state.hands[state.turn].splice(hi,1);
+      if(u.cap.t!=='L'){
+        const t=basePiece(u.cap.t);
+        const hi=state.hands[state.turn].lastIndexOf(t);
+        state.hands[state.turn].splice(hi,1);
+      }
     }
   }
 }
 
+function basePiece(t){ return t==='H'?'C':(t==='Q'?'N':t); }
+function inPromotionZone(i,o){
+  if(variant!=='goro') return false;
+  return o===0 ? rowOf(i)<=1 : rowOf(i)>=spec().rows-2;
+}
+
 function lionAt(state,o){
-  for(let i=0;i<12;i++){const p=state.bd[i]; if(p&&p.o===o&&p.t==='L') return i;}
+  for(let i=0;i<state.bd.length;i++){const p=state.bd[i]; if(p&&p.o===o&&p.t==='L') return i;}
   return -1;
 }
 
@@ -432,8 +483,8 @@ function lionAt(state,o){
 function winnerAfter(state,o){
   if(lionAt(state,1-o)<0) return o;              // ライオンを とった
   const li=lionAt(state,o);
-  const goal = o===0?0:3;
-  if((li/3|0)===goal && !attacked(state,li,1-o)) return o;  // トライ
+  const goal = o===0?0:spec().rows-1;
+  if(variant==='mini' && rowOf(li)===goal && !attacked(state,li,1-o)) return o;  // トライ
   return null;
 }
 
@@ -443,9 +494,9 @@ const WIN_SCORE=100000;
 
 function evaluate(state,o){
   let s=0;
-  for(let i=0;i<12;i++){
+  for(let i=0;i<state.bd.length;i++){
     const p=state.bd[i]; if(!p) continue;
-    const adv = p.o===0 ? 3-(i/3|0) : (i/3|0);     // あいてがわへ どれだけ すすんだか
+    const adv = p.o===0 ? spec().rows-1-rowOf(i) : rowOf(i);     // あいてがわへ どれだけ すすんだか
     let v=VAL[p.t];
     if(p.t==='L'){
       v += adv*6;                                  // トライを めざす
@@ -499,15 +550,24 @@ const $=id=>document.getElementById(id);
 const boardEl=$('board');
 
 function pieceHTML(p){
-  return '<div class="pc o'+p.o+'">'+EMOJI[p.t]+'</div>';
+  return '<div class="pc o'+p.o+'">'+EMOJI[p.t]+(p.t==='Q'?'<span class="power">★</span>':'')+'</div>';
 }
 
 // ばんの 1ます（じんちの いろ・コマ つき）。ゲームの ばんと きろくの ばんで つかう
-function makeCell(i,p){
+function makeCell(i,p,v=variant){
   const d=document.createElement('div');
-  d.className='cell'+(i<3?' goal0':'')+(i>8?' goal1':'');
+  const s=VARIANTS[v], r=(i/s.cols|0);
+  const goalRows=v==='goro'?2:1;
+  d.className='cell'+(r<goalRows?' goal0':'')+(r>=s.rows-goalRows?' goal1':'');
   if(p) d.innerHTML=pieceHTML(p);
   return d;
+}
+
+function configureBoard(el,v=variant){
+  const s=VARIANTS[v];
+  el.style.gridTemplateColumns=`repeat(${s.cols},1fr)`;
+  el.style.gridTemplateRows=`repeat(${s.rows},1fr)`;
+  el.style.aspectRatio=`${s.cols}/${s.rows}`;
 }
 
 // もちごまを しゅるいごとに 1つ（2まい いじょうは ×かず）ならべる。deco で えらんだ いろや タップを つける
@@ -531,9 +591,10 @@ function playerName(o){
 }
 
 function render(){
+  configureBoard(boardEl);
   boardEl.innerHTML='';
   const hi = sel ? legalTargets() : [];
-  for(let i=0;i<12;i++){
+  for(let i=0;i<bd.length;i++){
     const p=bd[i];
     const d=makeCell(i,p);
     if(sel && sel.kind==='board' && sel.idx===i) d.classList.add('sel');
@@ -576,12 +637,12 @@ function setBtnLabel(btn,label,count){
 
 // その ひと(o)が いま ヒントを つかえるか（コンピュータせんで つかえるのは じぶん(o=0)だけ）
 function canHint(o){
-  if(over || busy || hintsLeft[o]<=0) return false;
+  if(variant==='goro' || over || busy || hintsLeft[o]<=0) return false;
   return turn===o && (mode==='two' || o===0);
 }
 
 function updateHintBtn(btn,o){
-  setBtnLabel(btn,'💡 つぎの いって',hintsLeft[o]);
+  setBtnLabel(btn,variant==='goro'?'💡 ヒントは3×4のみ':'💡 つぎの いって',variant==='goro'?null:hintsLeft[o]);
   btn.disabled=!canHint(o);
 }
 
@@ -612,8 +673,8 @@ function renderHand(o){
 function legalTargets(){
   if(!sel) return [];
   const st=liveState();
-  if(sel.kind==='board') return movesFrom(st,sel.idx);
-  const out=[]; for(let i=0;i<12;i++) if(!bd[i]) out.push(i);
+  if(sel.kind==='board') return movesFrom(st,sel.idx).filter(to=>isLegalMove(st,turn,{from:sel.idx,to:to}));
+  const out=[]; for(let i=0;i<bd.length;i++) if(!bd[i] && canDrop(st,turn,sel.t,i) && isLegalMove(st,turn,{drop:sel.t,to:i})) out.push(i);
   return out;
 }
 
@@ -681,6 +742,7 @@ function finish(w,winType){
   const saved=saveHistory({
     date:new Date().toISOString(), mode:mode,
     p0:p0Name, p1:p1Name, winner:w, winType:winType, moves:moveCount,
+    variant:variant,
     finalBoard: snap.bd, finalHands: snap.hands
   });
   render();
@@ -756,7 +818,7 @@ function showOverlay(title,text,buttons){
 
 function showResult(title,text){
   showOverlay(title,text,[
-    ['もういちど',()=>begin(mode,cpuLevel)],
+    ['もういちど',()=>begin(mode,cpuLevel,variant)],
     ['📜 きろく・ランキング',()=>openHistory(),true],
     ['さいしょの がめんへ',()=>startMenu(),true],
   ]);
@@ -777,9 +839,10 @@ function hasGameInProgress(){
 
 function startMenu(){
   gameId++;   // のこっている タイマー（コンピュータの て・けっか がめん）は ここで うごかなく なる
-  showOverlay('どうぶつしょうぎ','あいての 🦁ライオンを とったら かち！\nじぶんの 🦁が いちばん おくに ついても かち！',[
-    ...CPU_LEVELS.map(lv=>['ひとりで あそぶ '+lv.label,()=>chooseNames('cpu',lv)]),
-    ['ふたりで あそぶ（2にん）',()=>chooseNames('two',null),true],
+  showOverlay('どうぶつしょうぎ','3×4は かんたんな どうぶつしょうぎ。\n5×6は ごろごろどうぶつしょうぎだよ。',[
+    ...CPU_LEVELS.map(lv=>['ひとりで あそぶ（3×4） '+lv.label,()=>chooseNames('cpu',lv,'mini')]),
+    ['ふたりで あそぶ（3×4）',()=>chooseNames('two',null,'mini'),true],
+    ['ふたりで あそぶ（5×6）',()=>chooseNames('two',null,'goro'),true],
     ['📜 きろく・ランキング',()=>openHistory(),true],
   ]);
   // まちがえて「さいしょから」を おしても もどれるように、とちゅうの ゲームが あれば ルールより うえに だす
@@ -795,8 +858,8 @@ function resumeGame(){
 }
 $('ovresume').onclick=()=>resumeGame();
 
-function begin(m,level){
-  mode=m; cpuLevel=level;
+function begin(m,level,v='mini'){
+  mode=m; cpuLevel=level; variant=v;
   initGame();
   $('overlay').classList.add('hide');
   render();
@@ -832,7 +895,7 @@ function saveNames(obj){
   return lsSet(DS_NAMES, JSON.stringify(Object.assign(loadNames(),obj)));
 }
 
-function chooseNames(m,level){
+function chooseNames(m,level,v='mini'){
   const saved=loadNames();
   $('overlay').classList.add('hide');
   const fields=$('nameFields'); fields.innerHTML='';
@@ -867,7 +930,7 @@ function chooseNames(m,level){
       saveNames({solo:p0Name});
     }
     $('nameOverlay').classList.remove('active');
-    begin(m,level);
+    begin(m,level,v);
   };
   const back=document.createElement('button');
   back.className='sub'; back.textContent='もどる';
@@ -886,19 +949,22 @@ const WIN_TYPES=['capture','try','stuck','repeat'];
 function sanitizeEntry(e){
   if(!e || typeof e!=='object') return null;
   if(typeof e.p0!=='string' && typeof e.p1!=='string') return null;   // なまえが ないのは きろくでは ない
+  const v=e.variant==='goro'?'goro':'mini';
+  const s=VARIANTS[v];
   const piece=p => (p && EMOJI[p.t] && (p.o===0||p.o===1)) ? {t:p.t,o:p.o} : null;
-  const hand =a => Array.isArray(a) ? a.filter(t=>EMOJI[t]).slice(0,12) : [];
+  const hand =a => Array.isArray(a) ? a.filter(t=>EMOJI[t]).slice(0,v==='goro'?16:12) : [];
   const board=Array.isArray(e.finalBoard) ? e.finalBoard : [];
   const winner=(e.winner===0||e.winner===1) ? e.winner : null;
   return {
     date: typeof e.date==='string' ? e.date : '',
     mode: e.mode==='two' ? 'two' : 'cpu',
+    variant:v,
     p0: String(e.p0==null?'？':e.p0).slice(0,ENTRY_NAME_MAX),
     p1: String(e.p1==null?'？':e.p1).slice(0,ENTRY_NAME_MAX),
     winner: winner,
     winType: WIN_TYPES.includes(e.winType) ? e.winType : (winner===null?'repeat':'try'),
     moves: Number.isFinite(e.moves) ? Math.max(0,Math.floor(e.moves)) : 0,
-    finalBoard: Array.from({length:12},(_,i)=>piece(board[i])),
+    finalBoard: Array.from({length:s.cols*s.rows},(_,i)=>piece(board[i])),
     finalHands: [hand(e.finalHands&&e.finalHands[0]), hand(e.finalHands&&e.finalHands[1])]
   };
 }
@@ -995,7 +1061,7 @@ function renderHistoryList(history){
         </div>
         <div class="h-date">${esc(fmtDate(h.date))}</div>
       </div>
-      <div class="h-sub">${resultLabel(h)} ・ ${esc(h.moves)}て</div>`;
+      <div class="h-sub">${h.variant==='goro'?'5×6':'3×4'} ・ ${resultLabel(h)} ・ ${esc(h.moves)}て</div>`;
     el.onclick=()=>openReplay(h);
     list.appendChild(el);
   });
@@ -1112,7 +1178,8 @@ function openReplay(h){
     ? `${h.winner===0?h.p0:h.p1} の かち（${resultLabel(h)}・${h.moves}て）`
     : `${resultLabel(h)}（${h.moves}て）`;
   const rb=$('replayBoard'); rb.innerHTML='';
-  for(let i=0;i<12;i++) rb.appendChild(makeCell(i,h.finalBoard[i]));
+  configureBoard(rb,h.variant);
+  for(let i=0;i<h.finalBoard.length;i++) rb.appendChild(makeCell(i,h.finalBoard[i],h.variant));
   fillHand($('replayHand1'),h.finalHands[1],1);
   fillHand($('replayHand0'),h.finalHands[0],0);
   $('replayOverlay').classList.add('active');
@@ -1127,7 +1194,7 @@ const BOARD_MIN_W=150;
 function fitBoard(){
   let others=0;
   for(const c of boardWrap.children) if(c!==boardEl) others+=c.offsetHeight;
-  const w=Math.floor((boardWrap.clientHeight-others)*3/4);
+  const w=Math.floor((boardWrap.clientHeight-others)*spec().cols/spec().rows);
   boardEl.style.width=Math.max(BOARD_MIN_W,w)+'px';   // うえの げんかいは CSS の max-width
 }
 if('ResizeObserver' in window) new ResizeObserver(fitBoard).observe(boardWrap);
