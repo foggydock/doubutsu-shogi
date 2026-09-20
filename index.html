@@ -730,6 +730,7 @@ function doMove(m){
   if(!genMoves(st,turn).length){ finish(1-turn,'stuck'); return; }
   // おなじ ばんめんが REPEAT_MAX かい でた → ひきわけ（せんにちて）
   if(repeatCount()>=REPEAT_MAX){ finish(null,'repeat'); return; }
+  saveCurrentGame();
   render();
   if(mode==='cpu'&&turn===1) cpuMove();
 }
@@ -741,6 +742,7 @@ function finish(w,winType){
   else if(mode==='two') text=playerName(w)+'の かち！';
   else                  text=(w===0?'🎉 きみの かち！':'コンピュータの かち…');
   over={text:text};
+  saveCurrentGame();
   const snap=cloneState();
   const saved=saveHistory({
     date:new Date().toISOString(), mode:mode,
@@ -799,7 +801,7 @@ function doUndo(o){
     const s=hist.pop();
     bd=s.bd; hands=s.hands; turn=s.turn; lastMove=s.last; moveCount=s.moves;
   }
-  over=null; sel=null; hintMove=null; render();
+  over=null; sel=null; hintMove=null; saveCurrentGame(); render();
 }
 $('undo').onclick=()=>doUndo(0);
 $('undo1').onclick=()=>doUndo(1);
@@ -862,6 +864,7 @@ function resumeGame(){
 $('ovresume').onclick=()=>resumeGame();
 
 function begin(m,level,v='mini'){
+  lsRemove(DS_CURRENT_GAME);
   mode=m; cpuLevel=level; variant=v;
   initGame();
   $('overlay').classList.add('hide');
@@ -874,6 +877,62 @@ function begin(m,level,v='mini'){
 function lsGet(key){ try{ return localStorage.getItem(key); }catch(e){ return null; } }
 function lsSet(key,val){ try{ localStorage.setItem(key,val); return true; }catch(e){ return false; } }
 function lsRemove(key){ try{ localStorage.removeItem(key); return true; }catch(e){ return false; } }
+
+/* ===== とちゅうの たいきょくを じどうほぞん ===== */
+// ページをとじても「つづきから」にもどれるようにする。よみこむデータは必ず形をたしかめる。
+const DS_CURRENT_GAME='doubutsuShogi_currentGame_v1';
+function pieceForVariant(p,v){
+  const allowed=v==='goro' ? ['L','C','H','N','D','Q'] : ['L','G','E','C','H'];
+  return p && allowed.includes(p.t) && (p.o===0||p.o===1) ? {t:p.t,o:p.o} : null;
+}
+function cleanMove(m){
+  if(!m || typeof m!=='object') return null;
+  const n=x=>Number.isInteger(x) && x>=0 && x<boardSize() ? x : null;
+  const to=n(m.to); if(to===null) return null;
+  if(typeof m.drop==='string') return {drop:m.drop,to:to};
+  const from=n(m.from); return from===null ? null : {from:from,to:to};
+}
+function cleanState(s,v){
+  if(!s || typeof s!=='object') return null;
+  const size=VARIANTS[v].cols*VARIANTS[v].rows;
+  if(!Array.isArray(s.bd) || s.bd.length!==size || !Array.isArray(s.hands) || s.hands.length!==2) return null;
+  const allowedHand=v==='goro' ? ['C','N','D'] : ['G','E','C'];
+  const hand=a=>Array.isArray(a) ? a.filter(t=>allowedHand.includes(t)).slice(0,16) : [];
+  if(!s.hands.every(Array.isArray) || (s.turn!==0&&s.turn!==1)) return null;
+  return {
+    bd:s.bd.map(p=>pieceForVariant(p,v)), hands:[hand(s.hands[0]),hand(s.hands[1])], turn:s.turn,
+    last:cleanMove(s.last), moves:Number.isInteger(s.moves)&&s.moves>=0?s.moves:0
+  };
+}
+function saveCurrentGame(){
+  if(over || !hist || !hist.length){ lsRemove(DS_CURRENT_GAME); return; }
+  const current=Object.assign(cloneState(),{last:lastMove,moves:moveCount});
+  const level=cpuLevel ? CPU_LEVELS.indexOf(cpuLevel) : -1;
+  const data={version:1,variant:variant,mode:mode,cpuLevel:level,p0:p0Name,p1:p1Name,
+    current:current,hist:hist};
+  try{ lsSet(DS_CURRENT_GAME,JSON.stringify(data)); }catch(e){}
+}
+function restoreCurrentGame(){
+  let raw;
+  try{ raw=JSON.parse(lsGet(DS_CURRENT_GAME)); }catch(e){ return false; }
+  if(!raw || raw.version!==1 || !VARIANTS[raw.variant] || !['two','cpu'].includes(raw.mode)) return false;
+  if(raw.mode==='cpu' && raw.variant!=='mini') return false;
+  const v=raw.variant;
+  // cleanState が boardSize をつかうため、検証中だけ対象のばんしゅにする
+  const before=variant; variant=v;
+  const current=cleanState(raw.current,v);
+  const past=Array.isArray(raw.hist) ? raw.hist.map(s=>cleanState(s,v)).filter(Boolean) : [];
+  variant=before;
+  if(!current || !past.length || past.length!==raw.hist.length){ return false; }
+  const level=Number.isInteger(raw.cpuLevel) ? CPU_LEVELS[raw.cpuLevel] : null;
+  if(raw.mode==='cpu' && !level) return false;
+  variant=v; mode=raw.mode; cpuLevel=level;
+  bd=current.bd; hands=current.hands; turn=current.turn; lastMove=current.last; moveCount=current.moves;
+  hist=past; over=null; sel=null; busy=false; hintMove=null; hintsLeft=[HINT_MAX,HINT_MAX];
+  p0Name=typeof raw.p0==='string'?raw.p0.slice(0,NAME_MAX):DEFAULT_NAMES.p0;
+  p1Name=typeof raw.p1==='string'?raw.p1.slice(0,NAME_MAX):(mode==='cpu'?'コンピュータ'+level.label:DEFAULT_NAMES.p1);
+  return true;
+}
 
 // HTMLに いれる もじれつを あんぜんに する
 function esc(s){
@@ -1204,6 +1263,7 @@ if('ResizeObserver' in window) new ResizeObserver(fitBoard).observe(boardWrap);
 else window.addEventListener('resize',fitBoard);
 fitBoard();
 
+restoreCurrentGame();
 startMenu();
 
 /* ===== オフラインでも あそべるように する ===== */
