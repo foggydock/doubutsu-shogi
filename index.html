@@ -586,12 +586,13 @@ function updateHintBtn(btn,o){
   btn.disabled=!canHint(o);
 }
 
-// まった＝「いま さした ひと」が とりけす もの。
-// だから o が さした ばあい（＝つぎは あいての ばん ＝ turn!==o）だけ おせる。
+// まった＝「いま さした あいての て」をとりけすもの。
+// だから o のばんになったとき（turn===o）だけおせる。
+// たとえば A → B のあと、A が「まった」をおすと B のてだけがもどる。
 // コンピュータせんは じぶん(o=0)の ボタンだけ。かいすうの せいげんは なし
 function canUndo(o){
   if(over || busy || !hist.length) return false;
-  if(mode==='two') return turn!==o && undoLeft[o]>0;
+  if(mode==='two') return turn===o && undoLeft[o]>0;
   return o===0;
 }
 
