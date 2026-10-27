@@ -240,8 +240,10 @@ h3.sec-title{font-size:14px;margin:4px 0 8px;text-align:left;opacity:.75;}
 <div id="historyOverlay" class="ov2">
   <div class="ov2-card">
     <h2>📜 たいせん きろく</h2>
-    <h3 class="sec-title">🏆 ふたりで あそんだ ランキング</h3>
+    <h3 class="sec-title">🏆 ふたりで あそんだ ランキング（3×4）</h3>
     <div id="rankBox"></div>
+    <h3 class="sec-title">🏆 ふたりで あそんだ ランキング（5×6）</h3>
+    <div id="rankBoxGoro"></div>
     <h3 class="sec-title">🤖 コンピュータせん（あなたの せいせき）</h3>
     <div id="cpuRankBox"></div>
     <h3 class="sec-title">さいきんの たいせん（タップで ばんめんを みる）</h3>
@@ -1069,10 +1071,11 @@ function statOf(stats,name){
   return stats[name] || (stats[name]={name:name,win:0,lose:0,draw:0});
 }
 
-function computeRanking(history){
+// 3×4 と 5×6 は ルールも ながさも ちがうので、ばんの しゅるい(v)ごとに しゅうけいする
+function computeRanking(history,v){
   const stats={};
   // おなじ なまえ どうしの たいせんは、1人に かちと まけが りょうほう ついて しまうので かぞえない
-  history.filter(h=>h.mode==='two' && h.p0!==h.p1).forEach(h=>{
+  history.filter(h=>h.mode==='two' && h.variant===v && h.p0!==h.p1).forEach(h=>{
     const a=statOf(stats,h.p0), b=statOf(stats,h.p1);
     if(h.winner===0)      { a.win++; b.lose++; }
     else if(h.winner===1) { b.win++; a.lose++; }
@@ -1150,7 +1153,8 @@ function renderHistoryList(history){
 
 function openHistory(){
   const history=loadHistory();
-  renderRankTable(computeRanking(history),'rankBox','ふたりで あそんだ きろくが たまると じゅんいが でるよ');
+  renderRankTable(computeRanking(history,'mini'),'rankBox','ふたりで あそんだ きろくが たまると じゅんいが でるよ');
+  renderRankTable(computeRanking(history,'goro'),'rankBoxGoro','5×6で ふたりで あそぶと じゅんいが でるよ');
   renderRankTable(computeCpuStats(history),'cpuRankBox','コンピュータせんの きろくが まだ ないよ');
   renderHistoryList(history);
   $('historyOverlay').classList.add('active');
