@@ -48,10 +48,10 @@ h1{font-size:22px;margin:6px 0 2px;letter-spacing:2px;}
   flex:1 1 0;min-height:0;width:100%;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
 }
+/* たて・よこの ますの かずと たてよこの ひりつは configureBoard() が ばんの しゅるいに あわせて きめる。
+   min-height:0 が ないと、ひりつより コマの えもじの たかさが ゆうせんされて ばんが たてに のびる */
 #board,#replayBoard{
-  display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(4,1fr);
-  gap:3px;background:var(--line);padding:3px;border-radius:8px;
-  aspect-ratio:3/4;
+  display:grid;gap:3px;background:var(--line);padding:3px;border-radius:8px;min-height:0;
 }
 /* はばは fitBoard() が のこりの たかさから きめる。ここの width は そのまえの しょきち、max-width が うえの げんかい */
 #board{width:min(86vw, 55vh * 0.75, 430px);max-width:min(86vw, 430px);}
@@ -284,6 +284,8 @@ h3.sec-title{font-size:14px;margin:4px 0 8px;text-align:left;opacity:.75;}
 // index = r*COLS+c   r=0 が うえ(あいて)、さいしゅうだんが した(じぶん)
 // o=0 が した(せんて/じぶん)。N=ねこ、D=いぬ、Q=パワーアップねこ
 const EMOJI={L:'🦁',G:'🦒',E:'🐘',C:'🐤',H:'🐔',N:'🐱',D:'🐶',Q:'🐱'};
+// コマの もじの いちらん（EMOJI[t] で たしかめると "constructor" なども とおって しまう）
+const PIECE_TYPES=Object.keys(EMOJI);
 const VAL  ={L:1000,G:60,E:55,C:25,H:70,N:45,D:70,Q:70};
 
 // うごきかた（o=0 めせん。まえ = row -1）
@@ -571,8 +573,10 @@ function makeCell(i,p,v=variant){
 
 function configureBoard(el,v=variant){
   const s=VARIANTS[v];
-  el.style.gridTemplateColumns=`repeat(${s.cols},1fr)`;
-  el.style.gridTemplateRows=`repeat(${s.rows},1fr)`;
+  // minmax(0,1fr)：コマの えもじの おおきさで ますが のびないように する（CSS の min-height:0 と セット）。
+  // ないと 5×6 を ちいさい がめんで ひらいた とき、ばんが たてに のびて もちごまや ボタンに かさなる
+  el.style.gridTemplateColumns=`repeat(${s.cols},minmax(0,1fr))`;
+  el.style.gridTemplateRows=`repeat(${s.rows},minmax(0,1fr))`;
   el.style.aspectRatio=`${s.cols}/${s.rows}`;
 }
 
@@ -630,6 +634,8 @@ function render(){
   updateHintBtn($('hint1'),1);
   updateUndoBtn($('undo'),0);
   updateUndoBtn($('undo1'),1);
+  // ばんの しゅるい（3×4／5×6）が かわると たてよこの ひりつも かわるので、そのたびに おおきさを あわせなおす
+  fitBoard();
 }
 
 // ボタンの もじと「のこり かいすう」の バッジ（count が null なら バッジなし）
@@ -676,12 +682,12 @@ function renderHand(o){
   });
 }
 
+// えらんだ コマ（または もちごま）で いける ます。ルールの はんていは genMoves と おなじ ものを つかう
 function legalTargets(){
   if(!sel) return [];
-  const st=liveState();
-  if(sel.kind==='board') return movesFrom(st,sel.idx).filter(to=>isLegalMove(st,turn,{from:sel.idx,to:to}));
-  const out=[]; for(let i=0;i<bd.length;i++) if(!bd[i] && canDrop(st,turn,sel.t,i) && isLegalMove(st,turn,{drop:sel.t,to:i})) out.push(i);
-  return out;
+  return genMoves(liveState(),turn)
+    .filter(m=> sel.kind==='board' ? m.from===sel.idx : m.drop===sel.t)
+    .map(m=>m.to);
 }
 
 /* ===== そうさ ===== */
@@ -839,6 +845,8 @@ const CPU_LEVELS=[
   {label:'🐔ふつう', depth:4, sloppy:2},
   {label:'🦁つよい', depth:6, sloppy:1},
 ];
+const CPU_NAME_PREFIX='コンピュータ';
+function cpuName(level){ return CPU_NAME_PREFIX+level.label; }
 
 // とちゅうの ゲームが あるか（1てでも さしていて、まだ おわっていない）
 function hasGameInProgress(){
@@ -888,11 +896,12 @@ function pieceForVariant(p,v){
   const allowed=v==='goro' ? ['L','C','H','N','D','Q'] : ['L','G','E','C','H'];
   return p && allowed.includes(p.t) && (p.o===0||p.o===1) ? {t:p.t,o:p.o} : null;
 }
-function cleanMove(m){
+function cleanMove(m,size){
   if(!m || typeof m!=='object') return null;
-  const n=x=>Number.isInteger(x) && x>=0 && x<boardSize() ? x : null;
+  const n=x=>Number.isInteger(x) && x>=0 && x<size ? x : null;
   const to=n(m.to); if(to===null) return null;
-  if(typeof m.drop==='string') return {drop:m.drop,to:to};
+  // もちごまを おいた ては from が ない（ほぞんすると {to} だけに なる）
+  if(m.from===undefined) return {to:to};
   const from=n(m.from); return from===null ? null : {from:from,to:to};
 }
 function cleanState(s,v){
@@ -904,15 +913,14 @@ function cleanState(s,v){
   if(!s.hands.every(Array.isArray) || (s.turn!==0&&s.turn!==1)) return null;
   return {
     bd:s.bd.map(p=>pieceForVariant(p,v)), hands:[hand(s.hands[0]),hand(s.hands[1])], turn:s.turn,
-    last:cleanMove(s.last), moves:Number.isInteger(s.moves)&&s.moves>=0?s.moves:0
+    last:cleanMove(s.last,size), moves:Number.isInteger(s.moves)&&s.moves>=0?s.moves:0
   };
 }
 function saveCurrentGame(){
   if(over || !hist || !hist.length){ lsRemove(DS_CURRENT_GAME); return; }
-  const current=Object.assign(cloneState(),{last:lastMove,moves:moveCount});
   const level=cpuLevel ? CPU_LEVELS.indexOf(cpuLevel) : -1;
   const data={version:1,variant:variant,mode:mode,cpuLevel:level,p0:p0Name,p1:p1Name,
-    current:current,hist:hist};
+    current:snapshot(),hist:hist,hints:hintsLeft};
   try{ lsSet(DS_CURRENT_GAME,JSON.stringify(data)); }catch(e){}
 }
 function restoreCurrentGame(){
@@ -921,19 +929,20 @@ function restoreCurrentGame(){
   if(!raw || raw.version!==1 || !VARIANTS[raw.variant] || !['two','cpu'].includes(raw.mode)) return false;
   if(raw.mode==='cpu' && raw.variant!=='mini') return false;
   const v=raw.variant;
-  // cleanState が boardSize をつかうため、検証中だけ対象のばんしゅにする
-  const before=variant; variant=v;
   const current=cleanState(raw.current,v);
   const past=Array.isArray(raw.hist) ? raw.hist.map(s=>cleanState(s,v)).filter(Boolean) : [];
-  variant=before;
   if(!current || !past.length || past.length!==raw.hist.length){ return false; }
   const level=Number.isInteger(raw.cpuLevel) ? CPU_LEVELS[raw.cpuLevel] : null;
   if(raw.mode==='cpu' && !level) return false;
+  // ヒントの のこりも もどす（よみなおすと 3かいに もどって しまわないように）。ふるい ほぞんには ないので そのときは さいしょの かず
+  const hints=Array.isArray(raw.hints) && raw.hints.length===2 &&
+    raw.hints.every(x=>Number.isInteger(x) && x>=0 && x<=HINT_MAX) ? raw.hints.slice() : [HINT_MAX,HINT_MAX];
   variant=v; mode=raw.mode; cpuLevel=level;
   bd=current.bd; hands=current.hands; turn=current.turn; lastMove=current.last; moveCount=current.moves;
-  hist=past; over=null; sel=null; busy=false; hintMove=null; hintsLeft=[HINT_MAX,HINT_MAX];
+  hist=past; over=null; sel=null; busy=false; hintMove=null; hintsLeft=hints;
   p0Name=typeof raw.p0==='string'?raw.p0.slice(0,NAME_MAX):DEFAULT_NAMES.p0;
-  p1Name=typeof raw.p1==='string'?raw.p1.slice(0,NAME_MAX):(mode==='cpu'?'コンピュータ'+level.label:DEFAULT_NAMES.p1);
+  // コンピュータの なまえは レベルから つくりなおす（なまえの もじすう せいげんで「コンピュータ🦁」のように きれないように）
+  p1Name=mode==='cpu' ? cpuName(level) : (typeof raw.p1==='string'?raw.p1.slice(0,NAME_MAX):DEFAULT_NAMES.p1);
   return true;
 }
 
@@ -991,7 +1000,7 @@ function chooseNames(m,level,v='mini'){
       saveNames({p0:p0Name,p1:p1Name});
     }else{
       p0Name=$('inP0').value.trim()||DEFAULT_NAMES.solo;
-      p1Name='コンピュータ'+level.label;
+      p1Name=cpuName(level);
       saveNames({solo:p0Name});
     }
     $('nameOverlay').classList.remove('active');
@@ -1016,8 +1025,8 @@ function sanitizeEntry(e){
   if(typeof e.p0!=='string' && typeof e.p1!=='string') return null;   // なまえが ないのは きろくでは ない
   const v=e.variant==='goro'?'goro':'mini';
   const s=VARIANTS[v];
-  const piece=p => (p && EMOJI[p.t] && (p.o===0||p.o===1)) ? {t:p.t,o:p.o} : null;
-  const hand =a => Array.isArray(a) ? a.filter(t=>EMOJI[t]).slice(0,v==='goro'?16:12) : [];
+  const piece=p => (p && PIECE_TYPES.includes(p.t) && (p.o===0||p.o===1)) ? {t:p.t,o:p.o} : null;
+  const hand =a => Array.isArray(a) ? a.filter(t=>PIECE_TYPES.includes(t)).slice(0,v==='goro'?16:12) : [];
   const board=Array.isArray(e.finalBoard) ? e.finalBoard : [];
   const winner=(e.winner===0||e.winner===1) ? e.winner : null;
   return {
@@ -1072,11 +1081,18 @@ function computeRanking(history){
   return Object.values(stats).map(statRow).sort((a,b)=> b.win-a.win || b.rate-a.rate);
 }
 
+// まえは「つづきから」で あいての なまえが とちゅうで きれて ほぞんされた（「コンピュータ🐤」など）。
+// ほぞんした きろくは かえずに、しゅうけいの ときだけ もとの レベルの なまえに まとめる
+function cpuStatName(p1){
+  const lv=CPU_LEVELS.find(lv=>p1.length>CPU_NAME_PREFIX.length && cpuName(lv).startsWith(p1));
+  return lv ? cpuName(lv) : p1;
+}
+
 // かち/まけは「じぶん(p0)からみた」せいせき（p0がかてば win++）
 function computeCpuStats(history){
   const stats={};
   history.filter(h=>h.mode==='cpu').forEach(h=>{
-    const s=statOf(stats,h.p1);
+    const s=statOf(stats,cpuStatName(h.p1));
     if(h.winner===0)      s.win++;
     else if(h.winner===1) s.lose++;
     else                  s.draw++;

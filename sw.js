@@ -11,7 +11,7 @@
  *    だから ファイルを かえて VERSION を あげわすれても、ずっと ふるいまま には ならない
  *    （つぎに ひらいた ときに あたらしく なる）。
  */
-const VERSION = 'v3';
+const VERSION = 'v4';
 // おなじ ドメイン（foggydock.github.io）の ほかの アプリと キャッシュの おきばが きょうつう なので、
 // けすのは この なまえで はじまる ふるい キャッシュだけに する
 const CACHE_PREFIX = 'doubutsu-shogi-';
@@ -20,8 +20,10 @@ const NET_TIMEOUT_MS = 3000;
 
 // スコープ（/doubutsu-shogi/ など）を きじゅんに した ぜったいURL
 const url   = path => new URL(path, self.location).toString();
-const INDEX = url('index.html');
-const ASSETS = ['./', 'index.html', 'manifest.json',
+// index.html は サーバが ./ へ てんそう（リダイレクト）するので、HTML は ./ の なまえで しまう。
+// てんそうを たどった こたえを ページに かえすと、ブラウザが うけとらず ひらけなくなる
+const INDEX = url('./');
+const ASSETS = ['./', 'manifest.json',
                 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'].map(url);
 
 self.addEventListener('install', e => {
@@ -41,7 +43,7 @@ self.addEventListener('activate', e => {
   );
 });
 
-const cachedIndex = () => caches.match(INDEX).then(r => r || caches.match(url('./')));
+const cachedIndex = () => caches.match(INDEX);
 
 self.addEventListener('fetch', e => {
   const req = e.request;
@@ -58,7 +60,7 @@ self.addEventListener('fetch', e => {
     // とれたら キャッシュを こうしん。ページへの へんじが さきに おわっても さいごまで やりきる。
     // clone は ページが よみはじめる まえに する ひつようが あるので、この then を さきに つなぐ。
     e.waitUntil(network.then(res => {
-      if (res.ok) {
+      if (res.ok && !res.redirected) {
         const copy = res.clone();
         return caches.open(CACHE).then(c => c.put(INDEX, copy));
       }
@@ -70,7 +72,8 @@ self.addEventListener('fetch', e => {
       // なかなか こたえが こない ときは キャッシュで さきに ひらく（キャッシュが なければ まちつづける）
       const timer = setTimeout(() => cachedIndex().then(r => { if (r) answer(r); }), NET_TIMEOUT_MS);
       network
-        .then(res => { clearTimeout(timer); answer(res); })
+        // てんそう された ときは、てんそうさきを ブラウザに ひらきなおして もらう（/index.html → / など）
+        .then(res => { clearTimeout(timer); answer(res.redirected ? Response.redirect(res.url, 302) : res); })
         .catch(() => { clearTimeout(timer); cachedIndex().then(r => answer(r || Response.error())); });
     }));
     return;
