@@ -1,6 +1,6 @@
 # doubutsu-shogi（どうぶつしょうぎ）
 
-奏志くん（7歳）とiPadで遊ぶゲーム。単一HTML、オフライン対応（Service Worker）。Cloudflare Pages で配信している。**`main` に push すると、GitHub Actions が自動で本番に配信する（1〜2分で反映）。** つまり push は、そのまま公開になる。
+家族でiPadで遊ぶゲーム。単一HTML、オフライン対応（Service Worker）。Cloudflare Pages で配信している。**`main` に push すると、GitHub Actions が自動で本番に配信する（1〜2分で反映）。** つまり push は、そのまま公開になる。
 
 ## 依頼する人について
 - 依頼者はプログラミング初心者。専門用語は避け、変更点を日本語で短く説明する。
